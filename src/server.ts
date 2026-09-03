@@ -28,7 +28,7 @@ const PUBLIC_DIR = join(process.cwd(), 'src', 'public')
 const REDACTED_SECRET_PATTERN = /(?:sk-or-v1-[A-Za-z0-9_-]+|Bearer\s+[A-Za-z0-9._-]+)/g
 const OPENROUTER_MODELS_ENDPOINT = 'https://openrouter.ai/api/v1/models'
 const MAX_REQUEST_BYTES = 64 * 1024
-const PAID_REQUEST_TIMEOUT_MS = 75_000
+const PAID_REQUEST_TIMEOUT_MS = 120_000
 const RATE_LIMIT_WINDOW_MS = 60_000
 const RATE_LIMIT_MAX = 8
 const PAID_CONCURRENCY_MAX = Number(process.env.PAID_CONCURRENCY_MAX ?? 2)
@@ -133,6 +133,9 @@ const server = createServer(async (req, res) => {
   }
 })
 
+server.keepAliveTimeout = 120_000
+server.headersTimeout = 125_000
+
 server.listen(PORT, () => {
   console.log(`ChainBrief AI is running at http://localhost:${PORT}`)
 })
@@ -195,7 +198,6 @@ async function handlePaidEndpoint(
   }
 
   activePaidRequests += 1
-  req.setTimeout(PAID_REQUEST_TIMEOUT_MS)
   try {
     await handler()
   } finally {
@@ -427,8 +429,13 @@ async function sanitizeResponseText(res: Response) {
 }
 
 function sendJson(res: ServerResponse, status: number, payload: unknown) {
-  res.writeHead(status, { 'content-type': 'application/json; charset=utf-8' })
-  res.end(JSON.stringify(payload))
+  const body = JSON.stringify(payload)
+  res.writeHead(status, {
+    'content-type': 'application/json; charset=utf-8',
+    'content-length': Buffer.byteLength(body),
+    'cache-control': 'no-store',
+  })
+  res.end(body)
 }
 
 function socialNotice(language: Language, sanitized: boolean) {
