@@ -2,6 +2,7 @@ const form = document.querySelector('#research-form')
 const queryInput = document.querySelector('#query')
 const identityHintInput = document.querySelector('#identity-hint')
 const accessCodeInput = document.querySelector('#access-code')
+const accessCodeLabel = document.querySelector('label[for="access-code"]')
 const formError = document.querySelector('#form-error')
 const researchButton = document.querySelector('#research-button')
 const emptyState = document.querySelector('#empty-state')
@@ -26,6 +27,8 @@ let currentIdentity = null
 let pendingPost = ''
 let draftApproved = false
 
+configureDemoAccess()
+
 form.addEventListener('submit', async (event) => {
   event.preventDefault()
   const query = queryInput.value.trim()
@@ -48,7 +51,7 @@ form.addEventListener('submit', async (event) => {
       headers: paidRequestHeaders(),
       body: JSON.stringify({ query, identityHint, language }),
     })
-    const body = await response.json()
+    const body = await readJsonResponse(response, 'The research service returned an empty or invalid response.')
     if (!response.ok) throw new Error(body.error ?? 'Research failed.')
 
     currentReportText = renderReport(body.result)
@@ -81,7 +84,7 @@ async function generateSocialPost(button) {
       headers: paidRequestHeaders(),
       body: JSON.stringify({ identity: currentIdentity, report: currentReportText, language, channel: button.dataset.channel }),
     })
-    const body = await response.json()
+    const body = await readJsonResponse(response, 'The drafting service returned an empty or invalid response.')
     if (!response.ok) throw new Error(body.error ?? 'Post generation failed.')
 
     pendingPost = body.draft
@@ -424,6 +427,32 @@ function updateDraftCount() {
 
 function currentLanguage() {
   return new FormData(form).get('language')
+}
+
+async function configureDemoAccess() {
+  try {
+    const response = await fetch('/api/health')
+    const body = await readJsonResponse(response, 'Health check returned an invalid response.')
+    if (!response.ok) return
+
+    const required = Boolean(body.configuration?.demoAccessCodeRequired)
+    accessCodeInput.classList.toggle('hidden', !required)
+    accessCodeLabel?.classList.toggle('hidden', !required)
+    if (!required) accessCodeInput.value = ''
+  } catch {
+    // Keep the field visible if the health check is unavailable.
+  }
+}
+
+async function readJsonResponse(response, fallbackMessage) {
+  const text = await response.text()
+  if (!text.trim()) throw new Error(`${fallbackMessage} HTTP ${response.status}.`)
+
+  try {
+    return JSON.parse(text)
+  } catch {
+    throw new Error(`${fallbackMessage} HTTP ${response.status}.`)
+  }
 }
 
 function paidRequestHeaders() {
