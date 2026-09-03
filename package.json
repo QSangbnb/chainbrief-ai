@@ -1,12 +1,16 @@
 {
-  "name": "orbio-starter",
+  "name": "chainbrief-ai",
   "version": "0.1.0",
   "private": true,
-  "description": "An example of building on an Orbio key. Not required reading, not a required stack.",
+  "description": "A bilingual crypto research agent built with OpenRouter web search.",
   "type": "module",
   "packageManager": "pnpm@10.4.1",
   "engines": { "node": ">=22" },
   "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "pnpm run build && node dist/server.js",
+    "start": "node dist/server.js",
+    "test": "pnpm run build && node --test tests/*.test.mjs",
     "chat": "tsx src/examples/01-chat.ts",
     "tools": "tsx src/examples/02-tools.ts",
     "structured": "tsx src/examples/03-structured.ts",

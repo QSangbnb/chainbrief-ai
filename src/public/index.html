@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ChainBrief AI</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="intro" aria-labelledby="title">
+        <div>
+          <p class="eyebrow">Bilingual crypto research</p>
+          <h1 id="title">ChainBrief AI</h1>
+          <p class="lede">Grounded briefs for tokens, projects, contracts, and crypto research questions.</p>
+        </div>
+        <div class="notice">Research only. No publishing, no trading, no financial advice.</div>
+      </section>
+
+      <section class="workspace">
+        <form id="research-form" class="panel">
+          <label for="query">Token, contract, project, or question</label>
+          <textarea
+            id="query"
+            name="query"
+            rows="5"
+            maxlength="500"
+            placeholder="Example: What are the main risks around Ethena USDe?"
+          ></textarea>
+
+          <label for="identity-hint" class="identity-label">Official URL, contract address, or blockchain</label>
+          <textarea
+            id="identity-hint"
+            name="identityHint"
+            rows="4"
+            maxlength="500"
+            placeholder="Example: https://www.orbio.so&#10;Robinhood Chain&#10;0x..."
+          ></textarea>
+
+          <label for="access-code">Demo access code</label>
+          <input id="access-code" name="accessCode" type="password" maxlength="120" autocomplete="off" />
+
+          <div class="controls">
+            <fieldset>
+              <legend>Language</legend>
+              <label class="choice"><input type="radio" name="language" value="en" checked /> English</label>
+              <label class="choice"><input type="radio" name="language" value="vi" /> Tiếng Việt</label>
+            </fieldset>
+            <button id="research-button" type="submit">Research</button>
+          </div>
+          <p id="form-error" class="field-error" role="alert"></p>
+        </form>
+
+        <section class="panel output" aria-live="polite">
+          <div id="empty-state" class="empty">
+            <h2>Ready for a brief</h2>
+            <p>Enter a crypto topic to generate a cited, compact research report.</p>
+          </div>
+
+          <div id="loading-state" class="loading hidden">
+            <div class="spinner" aria-hidden="true"></div>
+            <p>Searching the web and drafting the brief...</p>
+          </div>
+
+          <div id="report-state" class="hidden">
+            <div class="report-header">
+              <h2>Report</h2>
+              <button id="copy-report" type="button" class="secondary">Copy</button>
+            </div>
+            <article id="report" class="report"></article>
+
+            <div class="social-tools">
+              <button id="x-post-button" type="button" class="secondary" data-channel="x">Generate X Post</button>
+              <button id="binance-post-button" type="button" class="secondary" data-channel="binance">
+                Generate Binance Square Post
+              </button>
+            </div>
+          </div>
+
+          <div id="error-state" class="error hidden" role="alert"></div>
+        </section>
+      </section>
+
+      <section id="social-panel" class="panel social hidden" aria-live="polite">
+        <div class="report-header">
+          <h2>Social Draft</h2>
+          <span id="draft-status" class="status">Draft — approval required</span>
+        </div>
+        <div class="draft-meta">
+          <span id="draft-platform"></span>
+          <span id="draft-count"></span>
+        </div>
+        <p id="social-error" class="field-error" role="alert"></p>
+        <p id="approval-copy"></p>
+        <textarea id="social-post" class="post" rows="7"></textarea>
+        <div class="approval-row">
+          <button id="approve-button" type="button">Approve draft</button>
+          <button id="copy-post" type="button" class="secondary" disabled>Copy post</button>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

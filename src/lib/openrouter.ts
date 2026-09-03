@@ -29,7 +29,7 @@ export const openrouter = new OpenAI({
   baseURL: 'https://openrouter.ai/api/v1',
   defaultHeaders: {
     'HTTP-Referer': process.env.APP_URL ?? 'https://orbio.so/build',
-    'X-Title': process.env.APP_NAME ?? 'Orbio Build Week',
+    'X-Title': process.env.APP_NAME ?? 'ChainBrief AI',
   },
 })
 
