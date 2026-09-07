@@ -508,9 +508,9 @@ function localized(key, value) {
 }
 
 function flash(button, text) {
-  const previous = button.textContent
-  button.textContent = text
+  const previousNodes = Array.from(button.childNodes, (node) => node.cloneNode(true))
+  button.replaceChildren(document.createTextNode(text))
   window.setTimeout(() => {
-    button.textContent = previous
+    button.replaceChildren(...previousNodes)
   }, 900)
 }

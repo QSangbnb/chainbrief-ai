@@ -3,87 +3,292 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>ChainBrief AI</title>
+    <meta
+      name="description"
+      content="ChainBrief AI turns crypto questions into concise, source-backed research reports in English and Vietnamese."
+    />
+    <meta name="theme-color" content="#07111f" />
+    <title>ChainBrief AI — Grounded Crypto Research</title>
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
+    <div class="page-glow page-glow-one" aria-hidden="true"></div>
+    <div class="page-glow page-glow-two" aria-hidden="true"></div>
+
+    <header class="site-header">
+      <div class="header-inner">
+        <a class="brand" href="/" aria-label="ChainBrief AI home">
+          <span class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 32 32" role="img">
+              <path d="M9 8.5 16 4l7 4.5v7L16 20l-7-4.5z" />
+              <path d="M9 16.5 16 21l7-4.5v7L16 28l-7-4.5z" />
+            </svg>
+          </span>
+          <span class="brand-name">ChainBrief <strong>AI</strong></span>
+        </a>
+
+        <div class="header-actions">
+          <span class="network-status"><span class="status-dot"></span>Live research</span>
+          <a
+            class="github-link"
+            href="https://github.com/QSangbnb/chainbrief-ai"
+            target="_blank"
+            rel="noreferrer"
+            aria-label="View ChainBrief AI on GitHub"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M12 2C6.48 2 2 6.58 2 12.23c0 4.52 2.87 8.35 6.84 9.71.5.1.68-.22.68-.49 0-.24-.01-1.05-.01-1.91-2.78.62-3.37-1.21-3.37-1.21-.45-1.19-1.11-1.5-1.11-1.5-.91-.64.07-.63.07-.63 1 .07 1.53 1.06 1.53 1.06.9 1.57 2.35 1.12 2.92.85.09-.67.35-1.12.64-1.38-2.22-.26-4.56-1.14-4.56-5.06 0-1.12.39-2.03 1.03-2.75-.1-.26-.45-1.3.1-2.71 0 0 .84-.28 2.75 1.05A9.3 9.3 0 0 1 12 6.63a9.3 9.3 0 0 1 2.5.35c1.91-1.33 2.75-1.05 2.75-1.05.55 1.41.2 2.45.1 2.71.64.72 1.03 1.63 1.03 2.75 0 3.93-2.34 4.8-4.57 5.05.36.32.68.94.68 1.9 0 1.37-.01 2.47-.01 2.81 0 .27.18.6.69.49A10.25 10.25 0 0 0 22 12.23C22 6.58 17.52 2 12 2Z"
+              />
+            </svg>
+            <span>GitHub</span>
+          </a>
+        </div>
+      </div>
+    </header>
+
     <main class="shell">
       <section class="intro" aria-labelledby="title">
-        <div>
-          <p class="eyebrow">Bilingual crypto research</p>
-          <h1 id="title">ChainBrief AI</h1>
-          <p class="lede">Grounded briefs for tokens, projects, contracts, and crypto research questions.</p>
+        <div class="hero-copy">
+          <p class="eyebrow"><span></span>OpenRouter-powered intelligence</p>
+          <h1 id="title">Crypto research with <em>receipts.</em></h1>
+          <p class="lede">
+            Turn a token, contract, project, or market question into a concise brief grounded in live,
+            inspectable sources.
+          </p>
+          <div class="capability-list" aria-label="Product capabilities">
+            <span>Live web grounding</span>
+            <span>Identity safeguards</span>
+            <span>English + Vietnamese</span>
+          </div>
         </div>
-        <div class="notice">Research only. No publishing, no trading, no financial advice.</div>
+
+        <aside class="signal-card" aria-label="ChainBrief research workflow">
+          <div class="signal-card-header">
+            <span>Research pipeline</span>
+            <span class="live-chip"><i></i>Active</span>
+          </div>
+          <div class="signal-steps">
+            <div class="signal-step">
+              <span class="step-number">01</span>
+              <div>
+                <strong>Resolve identity</strong>
+                <small>Domain · chain · contract</small>
+              </div>
+              <b>✓</b>
+            </div>
+            <div class="signal-step">
+              <span class="step-number">02</span>
+              <div>
+                <strong>Search primary sources</strong>
+                <small>Current, traceable evidence</small>
+              </div>
+              <b>✓</b>
+            </div>
+            <div class="signal-step">
+              <span class="step-number">03</span>
+              <div>
+                <strong>Structure the brief</strong>
+                <small>Facts, signals, risks, sources</small>
+              </div>
+              <span class="mini-loader"></span>
+            </div>
+          </div>
+          <div class="signal-footer">
+            <span>Evidence-first output</span>
+            <span class="signal-bars" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+          </div>
+        </aside>
+      </section>
+
+      <section class="trust-banner" aria-label="Safety notice">
+        <div>
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 3 20 6v5c0 5-3.4 8.7-8 10-4.6-1.3-8-5-8-10V6z" />
+            <path d="m8.7 12 2.1 2.1 4.7-5" />
+          </svg>
+          <span><strong>Research-only workspace.</strong> No publishing, trading, or financial advice.</span>
+        </div>
+        <span class="trust-note">Sources stay visible</span>
       </section>
 
       <section class="workspace">
-        <form id="research-form" class="panel">
-          <label for="query">Token, contract, project, or question</label>
+        <form id="research-form" class="panel composer">
+          <div class="panel-heading">
+            <span class="panel-kicker">New brief</span>
+            <h2>Start your research</h2>
+            <p>Add an exact identifier when possible to prevent same-name project mixups.</p>
+          </div>
+
+          <label for="query" class="field-label">
+            <span>Research question</span>
+            <small>Required</small>
+          </label>
           <textarea
             id="query"
             name="query"
             rows="5"
             maxlength="500"
-            placeholder="Example: What are the main risks around Ethena USDe?"
+            placeholder="Ask about a token, protocol, contract, mechanism, or risk..."
           ></textarea>
+          <div class="field-meta">
+            <span>Be specific for a sharper brief</span>
+            <span>500 characters max</span>
+          </div>
 
-          <label for="identity-hint" class="identity-label">Official URL, contract address, or blockchain</label>
+          <label for="identity-hint" class="field-label identity-label">
+            <span>Official identifier</span>
+            <small>Recommended</small>
+          </label>
           <textarea
             id="identity-hint"
             name="identityHint"
             rows="4"
             maxlength="500"
-            placeholder="Example: https://www.orbio.so&#10;Robinhood Chain&#10;0x..."
+            placeholder="Official URL, blockchain, or contract address"
           ></textarea>
+          <div class="field-meta">
+            <span>One identifier per line</span>
+            <span>Used as a hard constraint</span>
+          </div>
 
-          <label for="access-code">Demo access code</label>
-          <input id="access-code" name="accessCode" type="password" maxlength="120" autocomplete="off" />
+          <label for="access-code" class="field-label access-code-label">
+            <span>Demo access code</span>
+            <small>Protected demo</small>
+          </label>
+          <input
+            id="access-code"
+            name="accessCode"
+            type="password"
+            maxlength="120"
+            autocomplete="off"
+            placeholder="Enter access code"
+          />
 
           <div class="controls">
-            <fieldset>
-              <legend>Language</legend>
-              <label class="choice"><input type="radio" name="language" value="en" checked /> English</label>
-              <label class="choice"><input type="radio" name="language" value="vi" /> Tiếng Việt</label>
+            <fieldset class="language-switch">
+              <legend>Report language</legend>
+              <div class="choice-row">
+                <label class="choice"><input type="radio" name="language" value="en" checked /><span>English</span></label>
+                <label class="choice"><input type="radio" name="language" value="vi" /><span>Tiếng Việt</span></label>
+              </div>
             </fieldset>
-            <button id="research-button" type="submit">Research</button>
+
+            <button id="research-button" type="submit" class="primary-button">
+              <span>Generate research brief</span>
+              <svg viewBox="0 0 20 20" aria-hidden="true">
+                <path d="M4 10h12M11 5l5 5-5 5" />
+              </svg>
+            </button>
           </div>
+
           <p id="form-error" class="field-error" role="alert"></p>
+
+          <div class="composer-footer">
+            <span><i></i>Live web search</span>
+            <span>Human review recommended</span>
+          </div>
         </form>
 
         <section class="panel output" aria-live="polite">
-          <div id="empty-state" class="empty">
-            <h2>Ready for a brief</h2>
-            <p>Enter a crypto topic to generate a cited, compact research report.</p>
-          </div>
-
-          <div id="loading-state" class="loading hidden">
-            <div class="spinner" aria-hidden="true"></div>
-            <p>Searching the web and drafting the brief...</p>
-          </div>
-
-          <div id="report-state" class="hidden">
-            <div class="report-header">
-              <h2>Report</h2>
-              <button id="copy-report" type="button" class="secondary">Copy</button>
+          <div class="output-topbar">
+            <div class="output-title">
+              <span class="output-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                  <path d="M5 4h14v16H5z" />
+                  <path d="M8 8h8M8 12h8M8 16h5" />
+                </svg>
+              </span>
+              <div>
+                <span class="panel-kicker">Workspace</span>
+                <h2>Research report</h2>
+              </div>
             </div>
-            <article id="report" class="report"></article>
-
-            <div class="social-tools">
-              <button id="x-post-button" type="button" class="secondary" data-channel="x">Generate X Post</button>
-              <button id="binance-post-button" type="button" class="secondary" data-channel="binance">
-                Generate Binance Square Post
-              </button>
-            </div>
+            <span class="evidence-badge"><i></i>Evidence mode</span>
           </div>
 
-          <div id="error-state" class="error hidden" role="alert"></div>
+          <div class="output-body">
+            <div id="empty-state" class="empty">
+              <div class="empty-visual" aria-hidden="true">
+                <span class="orbit orbit-one"></span>
+                <span class="orbit orbit-two"></span>
+                <svg viewBox="0 0 48 48">
+                  <path d="M19 7h10l2 5 5 2v10l-5 2-2 5H19l-2-5-5-2V14l5-2z" />
+                  <circle cx="24" cy="19" r="5" />
+                  <path d="M16.5 31c1.8-3.8 4.3-5.7 7.5-5.7s5.7 1.9 7.5 5.7" />
+                </svg>
+              </div>
+              <span class="empty-kicker">Ready when you are</span>
+              <h2>Ask a question. Get the evidence.</h2>
+              <p>
+                ChainBrief resolves the entity, searches current sources, and organizes the findings into a
+                reviewable report.
+              </p>
+              <div class="empty-steps">
+                <span><b>01</b>Identify</span>
+                <span><b>02</b>Research</span>
+                <span><b>03</b>Verify</span>
+              </div>
+            </div>
+
+            <div id="loading-state" class="loading hidden">
+              <div class="loader-visual" aria-hidden="true">
+                <span class="loader-ring"></span>
+                <span class="loader-core">
+                  <svg viewBox="0 0 24 24">
+                    <path d="M5 5h14v14H5zM8 9h8M8 13h5" />
+                  </svg>
+                </span>
+              </div>
+              <span class="empty-kicker">Research in progress</span>
+              <h2>Following the evidence trail...</h2>
+              <p>Resolving identity, searching live sources, and structuring your brief.</p>
+              <div class="loading-track"><span></span></div>
+            </div>
+
+            <div id="report-state" class="hidden">
+              <div class="report-header">
+                <div>
+                  <span class="panel-kicker">Completed brief</span>
+                  <h2>Report</h2>
+                </div>
+                <button id="copy-report" type="button" class="secondary">
+                  <svg viewBox="0 0 20 20" aria-hidden="true">
+                    <path d="M7 6V4h9v9h-2M4 7h9v9H4z" />
+                  </svg>
+                  <span>Copy report</span>
+                </button>
+              </div>
+
+              <article id="report" class="report"></article>
+
+              <div class="social-tools">
+                <div>
+                  <span class="panel-kicker">Repurpose safely</span>
+                  <p>Generate a draft from the verified report.</p>
+                </div>
+                <div class="social-actions">
+                  <button id="x-post-button" type="button" class="secondary" data-channel="x">
+                    Generate X post
+                  </button>
+                  <button id="binance-post-button" type="button" class="secondary" data-channel="binance">
+                    Generate Binance Square post
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div id="error-state" class="error hidden" role="alert"></div>
+          </div>
         </section>
       </section>
 
       <section id="social-panel" class="panel social hidden" aria-live="polite">
         <div class="report-header">
-          <h2>Social Draft</h2>
+          <div>
+            <span class="panel-kicker">Content studio</span>
+            <h2>Social draft</h2>
+          </div>
           <span id="draft-status" class="status">Draft — approval required</span>
         </div>
         <div class="draft-meta">
@@ -91,13 +296,19 @@
           <span id="draft-count"></span>
         </div>
         <p id="social-error" class="field-error" role="alert"></p>
-        <p id="approval-copy"></p>
+        <p id="approval-copy" class="approval-copy"></p>
         <textarea id="social-post" class="post" rows="7"></textarea>
         <div class="approval-row">
           <button id="approve-button" type="button">Approve draft</button>
           <button id="copy-post" type="button" class="secondary" disabled>Copy post</button>
         </div>
       </section>
+
+      <footer class="site-footer">
+        <span>ChainBrief AI</span>
+        <p>Built for Orbio Build Week · Powered by OpenRouter</p>
+        <a href="https://github.com/QSangbnb/chainbrief-ai" target="_blank" rel="noreferrer">View source</a>
+      </footer>
     </main>
 
     <script type="module" src="/app.js"></script>
