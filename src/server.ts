@@ -267,9 +267,15 @@ async function handleResearch(req: IncomingMessage, res: ServerResponse, user: A
 }
 
 async function handleSocial(req: IncomingMessage, res: ServerResponse) {
-  const payload = SocialDraftRequest.safeParse(await readJson(req, MAX_REQUEST_BYTES))
+  const rawPayload = await readJson(req, MAX_REQUEST_BYTES)
+  const payload = SocialDraftRequest.safeParse(rawPayload)
   if (!payload.success) {
-    sendJson(res, 400, { error: 'Generate a report first, then choose a social channel.' })
+    const reportIssue = payload.error.issues.find((issue) => issue.path[0] === 'report')
+    sendJson(res, 400, {
+      error: reportIssue
+        ? 'The report could not be prepared for social drafting. Reopen the report and try again.'
+        : 'Choose X, Threads, or Binance Square after generating a report.',
+    })
     return
   }
 
