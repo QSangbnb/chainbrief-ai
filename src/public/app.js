@@ -532,8 +532,8 @@ async function handleEmailAuth(event) {
       const result = await authClient.signUp(email, password)
       if (!result.session) {
         authPassword.value = ''
-        setAuthMessage('Account created. Check your email and confirm your address, then sign in.')
         setAuthMode('sign-in')
+        setAuthMessage('Account created. Check your email and confirm your address, then sign in.')
         return
       }
       currentUser = authClient.user
