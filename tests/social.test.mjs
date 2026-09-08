@@ -5,6 +5,7 @@ import {
   approvalAfterApprove,
   approvalAfterEdit,
   approvalInitialState,
+  compactReportForSocial,
   createDeterministicFallbackDraft,
   normalizeSocialPostText,
   sanitizeSocialDraft,
@@ -127,6 +128,16 @@ test('shortens Threads drafts deterministically to 500 characters', () => {
   )
 
   assert.equal([...draft].length <= 500, true)
+})
+
+test('compacts long reports for social drafting while preserving the beginning and sources at the end', () => {
+  const longReport = `BEGIN SUMMARY\n${'verified detail '.repeat(1600)}\nSOURCES AT END`
+  const compacted = compactReportForSocial(longReport)
+
+  assert.equal([...compacted].length <= 16000, true)
+  assert.match(compacted, /^BEGIN SUMMARY/)
+  assert.match(compacted, /Middle sections omitted/)
+  assert.match(compacted, /SOURCES AT END$/)
 })
 
 test('normalizes serialized Binance Square JSON into clean post text', () => {
