@@ -10,10 +10,25 @@ export const SocialDraftRequest = z.object({
     chainId: z.string().nullable().default(null),
     contractAddress: z.string().nullable().default(null),
   }),
-  report: z.string().trim().min(50).max(12000),
+  report: z.string().trim().min(50).max(18000),
   language: z.enum(['en', 'vi']),
   channel: z.enum(['x', 'binance', 'threads']),
 })
+
+export const SOCIAL_REPORT_MAX_CHARS = 16000
+
+export function compactReportForSocial(report: string) {
+  const characters = Array.from(report.trim())
+  if (characters.length <= SOCIAL_REPORT_MAX_CHARS) return characters.join('')
+
+  const omission = '\n\n[Middle sections omitted for social drafting]\n\n'
+  const omissionLength = Array.from(omission).length
+  const available = SOCIAL_REPORT_MAX_CHARS - omissionLength
+  const headLength = Math.floor(available * 0.65)
+  const tailLength = available - headLength
+
+  return `${characters.slice(0, headLength).join('')}${omission}${characters.slice(-tailLength).join('')}`
+}
 
 export type SocialChannel = z.infer<typeof SocialDraftRequest>['channel']
 export type SocialLanguage = z.infer<typeof SocialDraftRequest>['language']
