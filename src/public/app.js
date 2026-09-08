@@ -67,6 +67,7 @@ const sharedTitle = document.querySelector('#shared-title')
 const toast = document.querySelector('#toast')
 
 let currentReportText = ''
+const SOCIAL_REPORT_MAX_CHARS = 16000
 let currentIdentity = null
 let currentBriefId = null
 let currentBriefTitle = ''
@@ -181,7 +182,12 @@ async function generateSocialPost(button) {
     const response = await fetch('/api/social', {
       method: 'POST',
       headers: await paidRequestHeaders(),
-      body: JSON.stringify({ identity: currentIdentity, report: currentReportText, language, channel: button.dataset.channel }),
+      body: JSON.stringify({
+        identity: currentIdentity,
+        report: compactReportForSocial(currentReportText),
+        language,
+        channel: button.dataset.channel,
+      }),
     })
     const body = await readJsonResponse(response, 'The drafting service returned an empty or invalid response.')
     if (response.status === 401) handleExpiredSession(body.error)
@@ -203,6 +209,17 @@ async function generateSocialPost(button) {
     setSocialButtonsDisabled(false)
     button.textContent = previousText
   }
+}
+
+function compactReportForSocial(report) {
+  const characters = Array.from(report.trim())
+  if (characters.length <= SOCIAL_REPORT_MAX_CHARS) return characters.join('')
+
+  const omission = '\n\n[Middle sections omitted for social drafting]\n\n'
+  const available = SOCIAL_REPORT_MAX_CHARS - Array.from(omission).length
+  const headLength = Math.floor(available * 0.65)
+  const tailLength = available - headLength
+  return `${characters.slice(0, headLength).join('')}${omission}${characters.slice(-tailLength).join('')}`
 }
 
 approveButton.addEventListener('click', () => {
