@@ -1,5 +1,8 @@
 const SESSION_STORAGE_KEY = 'chainbrief-auth-session'
 const REFRESH_MARGIN_MS = 60_000
+export const SESSION_INACTIVITY_MS = 3 * 24 * 60 * 60 * 1000
+const ACTIVITY_WRITE_INTERVAL_MS = 60_000
+const SESSION_EXPIRED_EVENT = 'chainbrief-session-expired'
 
 export async function createAuthClient() {
   const response = await fetch('/api/auth/config', {
@@ -20,17 +23,25 @@ class BrowserAuthClient {
     this.config = config
     this.session = null
     this.user = null
+    this.activityTrackingStarted = false
+    this.lastActivityWriteAt = 0
   }
 
   async initialize() {
     const callback = consumeOAuthCallback()
     if (callback.error) throw new Error(callback.error)
 
-    this.session = callback.session || readStoredSession()
+    if (callback.session) this.setSession(callback.session)
+    else this.session = readStoredSession()
     if (!this.session) return null
+    if (isSessionInactive(this.session)) {
+      this.clearSession()
+      return null
+    }
 
     const user = await this.getUser()
     if (!user) this.clearSession()
+    else this.startActivityTracking()
     return user
   }
 
@@ -41,6 +52,7 @@ class BrowserAuthClient {
     })
     this.setSession(sessionFromPayload(body))
     this.user = requireUser(body.user)
+    this.startActivityTracking()
     return this.user
   }
 
@@ -55,6 +67,7 @@ class BrowserAuthClient {
     if (session) {
       this.setSession(session)
       this.user = requireUser(body.user)
+      this.startActivityTracking()
     }
     return { user: body.user || null, session }
   }
@@ -82,10 +95,15 @@ class BrowserAuthClient {
 
   async accessToken() {
     if (!this.session) return null
+    if (isSessionInactive(this.session)) {
+      this.expireInactiveSession()
+      return null
+    }
     if (this.session.expiresAt <= Date.now() + REFRESH_MARGIN_MS) {
       const refreshed = await this.refreshSession()
       if (!refreshed) return null
     }
+    this.markActivity()
     return this.session.accessToken
   }
 
@@ -138,8 +156,41 @@ class BrowserAuthClient {
   }
 
   setSession(session) {
-    this.session = session
-    localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session))
+    this.session = {
+      ...session,
+      lastActiveAt: Number.isFinite(session.lastActiveAt) ? session.lastActiveAt : Date.now(),
+    }
+    localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(this.session))
+  }
+
+  startActivityTracking() {
+    if (this.activityTrackingStarted) return
+    this.activityTrackingStarted = true
+    const markActivity = () => this.markActivity()
+    window.addEventListener('pointerdown', markActivity, { passive: true })
+    window.addEventListener('keydown', markActivity)
+    window.addEventListener('touchstart', markActivity, { passive: true })
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') this.markActivity()
+    })
+  }
+
+  markActivity() {
+    if (!this.session) return
+    const now = Date.now()
+    if (isSessionInactive(this.session, now)) {
+      this.expireInactiveSession()
+      return
+    }
+    if (now - this.lastActivityWriteAt < ACTIVITY_WRITE_INTERVAL_MS) return
+    this.lastActivityWriteAt = now
+    this.session.lastActiveAt = now
+    localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(this.session))
+  }
+
+  expireInactiveSession() {
+    this.clearSession()
+    window.dispatchEvent(new window.Event(SESSION_EXPIRED_EVENT))
   }
 
   headers(accessToken) {
@@ -186,6 +237,7 @@ function consumeOAuthCallback() {
       accessToken,
       refreshToken,
       expiresAt: Date.now() + Math.max(expiresIn, 60) * 1000,
+      lastActiveAt: Date.now(),
     },
   }
 }
@@ -201,6 +253,7 @@ function sessionFromPayload(body, optional = false) {
     accessToken,
     refreshToken,
     expiresAt: Date.now() + Math.max(Number(body.expires_in || 3600), 60) * 1000,
+    lastActiveAt: Date.now(),
   }
 }
 
@@ -213,12 +266,21 @@ function readStoredSession() {
       typeof parsed.refreshToken === 'string' &&
       Number.isFinite(parsed.expiresAt)
     ) {
-      return parsed
+      return {
+        accessToken: parsed.accessToken,
+        refreshToken: parsed.refreshToken,
+        expiresAt: parsed.expiresAt,
+        lastActiveAt: Number.isFinite(parsed.lastActiveAt) ? parsed.lastActiveAt : Date.now(),
+      }
     }
   } catch {
     localStorage.removeItem(SESSION_STORAGE_KEY)
   }
   return null
+}
+
+export function isSessionInactive(session, now = Date.now()) {
+  return !Number.isFinite(session?.lastActiveAt) || now - session.lastActiveAt >= SESSION_INACTIVITY_MS
 }
 
 function requireUser(value) {
