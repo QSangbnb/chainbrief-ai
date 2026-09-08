@@ -29,20 +29,13 @@
 
         <div class="header-actions">
           <span class="network-status"><span class="status-dot"></span>Live research</span>
-          <a
-            class="github-link"
-            href="https://github.com/QSangbnb/chainbrief-ai"
-            target="_blank"
-            rel="noreferrer"
-            aria-label="View ChainBrief AI on GitHub"
-          >
+          <button id="auth-button" class="auth-button" type="button" aria-haspopup="dialog">
             <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path
-                d="M12 2C6.48 2 2 6.58 2 12.23c0 4.52 2.87 8.35 6.84 9.71.5.1.68-.22.68-.49 0-.24-.01-1.05-.01-1.91-2.78.62-3.37-1.21-3.37-1.21-.45-1.19-1.11-1.5-1.11-1.5-.91-.64.07-.63.07-.63 1 .07 1.53 1.06 1.53 1.06.9 1.57 2.35 1.12 2.92.85.09-.67.35-1.12.64-1.38-2.22-.26-4.56-1.14-4.56-5.06 0-1.12.39-2.03 1.03-2.75-.1-.26-.45-1.3.1-2.71 0 0 .84-.28 2.75 1.05A9.3 9.3 0 0 1 12 6.63a9.3 9.3 0 0 1 2.5.35c1.91-1.33 2.75-1.05 2.75-1.05.55 1.41.2 2.45.1 2.71.64.72 1.03 1.63 1.03 2.75 0 3.93-2.34 4.8-4.57 5.05.36.32.68.94.68 1.9 0 1.37-.01 2.47-.01 2.81 0 .27.18.6.69.49A10.25 10.25 0 0 0 22 12.23C22 6.58 17.52 2 12 2Z"
-              />
+              <circle cx="12" cy="8" r="3.5" />
+              <path d="M5.5 20c.7-4 3-6 6.5-6s5.8 2 6.5 6" />
             </svg>
-            <span>GitHub</span>
-          </a>
+            <span id="auth-button-label">Sign in</span>
+          </button>
         </div>
       </div>
     </header>
@@ -146,6 +139,8 @@
           </div>
 
           <p id="form-error" class="field-error" role="alert"></p>
+
+          <p id="auth-gate" class="auth-gate"><i></i><span id="auth-gate-label">Sign in with email or Google to run research.</span></p>
 
           <div class="composer-footer">
             <span><i></i>Live web search</span>
@@ -273,6 +268,79 @@
         <a href="https://github.com/QSangbnb/chainbrief-ai" target="_blank" rel="noreferrer">View source</a>
       </footer>
     </main>
+
+    <div id="auth-modal" class="auth-modal hidden" aria-hidden="true">
+      <button id="auth-backdrop" class="auth-backdrop" type="button" aria-label="Close sign-in dialog"></button>
+      <section class="auth-card" role="dialog" aria-modal="true" aria-labelledby="auth-title" tabindex="-1">
+        <button id="auth-close" class="auth-close" type="button" aria-label="Close sign-in dialog">×</button>
+
+        <div class="auth-brand" aria-hidden="true">
+          <span class="brand-mark">
+            <svg viewBox="0 0 32 32">
+              <path d="M9 8.5 16 4l7 4.5v7L16 20l-7-4.5z" />
+              <path d="M9 16.5 16 21l7-4.5v7L16 28l-7-4.5z" />
+            </svg>
+          </span>
+        </div>
+
+        <div id="auth-form-view">
+          <div class="auth-heading">
+            <span class="panel-kicker">Member access</span>
+            <h2 id="auth-title">Welcome to ChainBrief AI</h2>
+            <p>Sign in to generate grounded research and social drafts.</p>
+          </div>
+
+          <button id="google-sign-in" class="google-button" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M21.6 12.2c0-.7-.1-1.4-.2-2H12v3.9h5.4a4.6 4.6 0 0 1-2 3v2.5h3.3c1.9-1.8 2.9-4.3 2.9-7.4Z" />
+              <path d="M12 22c2.7 0 5-.9 6.7-2.4l-3.3-2.5c-.9.6-2.1 1-3.4 1a5.9 5.9 0 0 1-5.5-4.1H3.1v2.6A10 10 0 0 0 12 22Z" />
+              <path d="M6.5 14a6 6 0 0 1 0-3.9V7.5H3.1a10 10 0 0 0 0 9.1L6.5 14Z" />
+              <path d="M12 6.1c1.5 0 2.8.5 3.9 1.5l2.9-2.9A9.8 9.8 0 0 0 3.1 7.5l3.4 2.6A5.9 5.9 0 0 1 12 6.1Z" />
+            </svg>
+            <span>Continue with Google</span>
+          </button>
+
+          <div class="auth-divider"><span>or continue with email</span></div>
+
+          <div class="auth-tabs" role="tablist" aria-label="Email access mode">
+            <button id="sign-in-tab" class="active" type="button" role="tab" aria-selected="true">Sign in</button>
+            <button id="sign-up-tab" type="button" role="tab" aria-selected="false">Create account</button>
+          </div>
+
+          <form id="email-auth-form" class="email-auth-form" novalidate>
+            <label for="auth-email">Email address</label>
+            <input id="auth-email" name="email" type="email" autocomplete="email" required placeholder="you@example.com" />
+
+            <label for="auth-password">Password</label>
+            <input
+              id="auth-password"
+              name="password"
+              type="password"
+              minlength="8"
+              autocomplete="current-password"
+              required
+              placeholder="At least 8 characters"
+            />
+
+            <button id="email-auth-submit" class="primary-button auth-submit" type="submit">
+              <span>Sign in with email</span>
+              <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10h12M11 5l5 5-5 5" /></svg>
+            </button>
+          </form>
+
+          <p id="auth-message" class="auth-message" role="status"></p>
+          <p class="auth-privacy">Your password is handled by Supabase Auth and is never sent to OpenRouter.</p>
+        </div>
+
+        <div id="account-view" class="account-view hidden">
+          <span id="account-avatar" class="account-avatar" aria-hidden="true">C</span>
+          <span class="panel-kicker">Signed in</span>
+          <h2>Your ChainBrief account</h2>
+          <p id="account-email"></p>
+          <button id="sign-out-button" class="secondary account-sign-out" type="button">Sign out</button>
+        </div>
+      </section>
+    </div>
 
     <script type="module" src="/app.js"></script>
   </body>

@@ -1,3 +1,5 @@
+import { createAuthClient } from './auth.js'
+
 const form = document.querySelector('#research-form')
 const queryInput = document.querySelector('#query')
 const identityHintInput = document.querySelector('#identity-hint')
@@ -21,16 +23,66 @@ const copyPostButton = document.querySelector('#copy-post')
 const draftStatus = document.querySelector('#draft-status')
 const draftPlatform = document.querySelector('#draft-platform')
 const draftCount = document.querySelector('#draft-count')
+const authButton = document.querySelector('#auth-button')
+const authButtonLabel = document.querySelector('#auth-button-label')
+const authGate = document.querySelector('#auth-gate')
+const authGateLabel = document.querySelector('#auth-gate-label')
+const authModal = document.querySelector('#auth-modal')
+const authBackdrop = document.querySelector('#auth-backdrop')
+const authCard = document.querySelector('.auth-card')
+const authClose = document.querySelector('#auth-close')
+const authFormView = document.querySelector('#auth-form-view')
+const accountView = document.querySelector('#account-view')
+const accountAvatar = document.querySelector('#account-avatar')
+const accountEmail = document.querySelector('#account-email')
+const googleSignIn = document.querySelector('#google-sign-in')
+const signInTab = document.querySelector('#sign-in-tab')
+const signUpTab = document.querySelector('#sign-up-tab')
+const emailAuthForm = document.querySelector('#email-auth-form')
+const authEmail = document.querySelector('#auth-email')
+const authPassword = document.querySelector('#auth-password')
+const emailAuthSubmit = document.querySelector('#email-auth-submit')
+const authMessage = document.querySelector('#auth-message')
+const signOutButton = document.querySelector('#sign-out-button')
 
 let currentReportText = ''
 let currentIdentity = null
 let pendingPost = ''
 let draftApproved = false
+let authClient = null
+let currentUser = null
+let authMode = 'sign-in'
+let authConfigurationError = ''
 
-configureDemoAccess()
+initializeApp()
+
+authButton.addEventListener('click', () => openAuthModal())
+authClose.addEventListener('click', closeAuthModal)
+authBackdrop.addEventListener('click', closeAuthModal)
+signInTab.addEventListener('click', () => setAuthMode('sign-in'))
+signUpTab.addEventListener('click', () => setAuthMode('sign-up'))
+googleSignIn.addEventListener('click', () => {
+  if (!authClient) {
+    setAuthMessage(authConfigurationError || 'Sign-in is not available yet.', true)
+    return
+  }
+  googleSignIn.disabled = true
+  authClient.signInWithGoogle()
+})
+emailAuthForm.addEventListener('submit', handleEmailAuth)
+signOutButton.addEventListener('click', handleSignOut)
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && !authModal.classList.contains('hidden')) closeAuthModal()
+})
 
 form.addEventListener('submit', async (event) => {
   event.preventDefault()
+
+  if (!currentUser) {
+    formError.textContent = 'Sign in with email or Google before starting research.'
+    openAuthModal()
+    return
+  }
   const query = queryInput.value.trim()
   const identityHint = identityHintInput.value.trim()
   const language = new FormData(form).get('language')
@@ -48,10 +100,11 @@ form.addEventListener('submit', async (event) => {
   try {
     const response = await fetch('/api/research', {
       method: 'POST',
-      headers: paidRequestHeaders(),
+      headers: await paidRequestHeaders(),
       body: JSON.stringify({ query, identityHint, language }),
     })
     const body = await readJsonResponse(response, 'The research service returned an empty or invalid response.')
+    if (response.status === 401) handleExpiredSession(body.error)
     if (!response.ok) throw new Error(body.error ?? 'Research failed.')
 
     currentReportText = renderReport(body.result)
@@ -71,6 +124,10 @@ for (const button of socialButtons) {
 
 async function generateSocialPost(button) {
   if (!currentReportText || !currentIdentity) return
+  if (!currentUser) {
+    openAuthModal('Sign in again to generate a social draft.')
+    return
+  }
   setSocialButtonsDisabled(true)
   const previousText = button.textContent
   button.textContent = 'Generating...'
@@ -81,10 +138,11 @@ async function generateSocialPost(button) {
     const language = new FormData(form).get('language')
     const response = await fetch('/api/social', {
       method: 'POST',
-      headers: paidRequestHeaders(),
+      headers: await paidRequestHeaders(),
       body: JSON.stringify({ identity: currentIdentity, report: currentReportText, language, channel: button.dataset.channel }),
     })
     const body = await readJsonResponse(response, 'The drafting service returned an empty or invalid response.')
+    if (response.status === 401) handleExpiredSession(body.error)
     if (!response.ok) throw new Error(body.error ?? 'Post generation failed.')
 
     pendingPost = body.draft
@@ -429,6 +487,160 @@ function currentLanguage() {
   return new FormData(form).get('language')
 }
 
+async function initializeApp() {
+  configureDemoAccess()
+
+  try {
+    authClient = await createAuthClient()
+    try {
+      currentUser = await authClient.initialize()
+    } catch (error) {
+      authConfigurationError = error instanceof Error ? error.message : 'Authentication could not be completed.'
+      openAuthModal(authConfigurationError)
+    }
+  } catch (error) {
+    authConfigurationError = error instanceof Error ? error.message : 'Sign-in is not configured.'
+  }
+
+  updateAuthUi()
+}
+
+async function handleEmailAuth(event) {
+  event.preventDefault()
+  if (!authClient) {
+    setAuthMessage(authConfigurationError || 'Sign-in is not available yet.', true)
+    return
+  }
+
+  const email = authEmail.value.trim()
+  const password = authPassword.value
+  if (!authEmail.validity.valid || !email) {
+    setAuthMessage('Enter a valid email address.', true)
+    authEmail.focus()
+    return
+  }
+  if (password.length < 8) {
+    setAuthMessage('Use a password with at least 8 characters.', true)
+    authPassword.focus()
+    return
+  }
+
+  setAuthControlsDisabled(true)
+  setAuthMessage('')
+  try {
+    if (authMode === 'sign-up') {
+      const result = await authClient.signUp(email, password)
+      if (!result.session) {
+        authPassword.value = ''
+        setAuthMessage('Account created. Check your email and confirm your address, then sign in.')
+        setAuthMode('sign-in')
+        return
+      }
+      currentUser = authClient.user
+    } else {
+      currentUser = await authClient.signInWithPassword(email, password)
+    }
+
+    authPassword.value = ''
+    updateAuthUi()
+    closeAuthModal()
+  } catch (error) {
+    setAuthMessage(error instanceof Error ? error.message : 'Authentication failed.', true)
+  } finally {
+    setAuthControlsDisabled(false)
+  }
+}
+
+async function handleSignOut() {
+  if (!authClient) return
+  signOutButton.disabled = true
+  try {
+    await authClient.signOut()
+    currentUser = null
+    currentReportText = ''
+    currentIdentity = null
+    socialPanel.classList.add('hidden')
+    setResearchState('empty')
+    updateAuthUi()
+    closeAuthModal()
+  } finally {
+    signOutButton.disabled = false
+  }
+}
+
+function setAuthMode(mode) {
+  authMode = mode
+  const signingIn = mode === 'sign-in'
+  signInTab.classList.toggle('active', signingIn)
+  signUpTab.classList.toggle('active', !signingIn)
+  signInTab.setAttribute('aria-selected', String(signingIn))
+  signUpTab.setAttribute('aria-selected', String(!signingIn))
+  authPassword.autocomplete = signingIn ? 'current-password' : 'new-password'
+  emailAuthSubmit.querySelector('span').textContent = signingIn ? 'Sign in with email' : 'Create account'
+  setAuthMessage('')
+}
+
+function openAuthModal(message = '') {
+  const signedIn = Boolean(currentUser)
+  authFormView.classList.toggle('hidden', signedIn)
+  accountView.classList.toggle('hidden', !signedIn)
+  setAuthMessage(message || (!authClient ? authConfigurationError : ''), Boolean(message || !authClient))
+  authModal.classList.remove('hidden')
+  authModal.setAttribute('aria-hidden', 'false')
+  document.body.classList.add('auth-open')
+  window.setTimeout(() => {
+    if (signedIn) signOutButton.focus()
+    else if (authClient) googleSignIn.focus()
+    else authCard.focus()
+  }, 0)
+}
+
+function closeAuthModal() {
+  authModal.classList.add('hidden')
+  authModal.setAttribute('aria-hidden', 'true')
+  document.body.classList.remove('auth-open')
+  authButton.focus()
+}
+
+function updateAuthUi() {
+  const signedIn = Boolean(currentUser)
+  authButton.classList.toggle('is-authenticated', signedIn)
+  authGate.classList.toggle('is-authenticated', signedIn)
+  authButtonLabel.textContent = signedIn ? 'Account' : 'Sign in'
+
+  if (signedIn) {
+    const email = currentUser.email || 'Authenticated user'
+    authGateLabel.textContent = 'Signed in as ' + email
+    accountEmail.textContent = email
+    accountAvatar.textContent = email.slice(0, 1).toUpperCase()
+  } else {
+    authGateLabel.textContent = authConfigurationError || 'Sign in with email or Google to run research.'
+    accountEmail.textContent = ''
+    accountAvatar.textContent = 'C'
+  }
+}
+
+function setAuthControlsDisabled(disabled) {
+  googleSignIn.disabled = disabled
+  signInTab.disabled = disabled
+  signUpTab.disabled = disabled
+  authEmail.disabled = disabled
+  authPassword.disabled = disabled
+  emailAuthSubmit.disabled = disabled
+}
+
+function setAuthMessage(message, isError = false) {
+  authMessage.textContent = message
+  authMessage.classList.toggle('is-error', isError)
+}
+
+function handleExpiredSession(message) {
+  authClient?.clearSession()
+  currentUser = null
+  updateAuthUi()
+  openAuthModal(message || 'Your session expired. Please sign in again.')
+}
+
 async function configureDemoAccess() {
   try {
     const response = await fetch('/api/health')
@@ -455,8 +667,14 @@ async function readJsonResponse(response, fallbackMessage) {
   }
 }
 
-function paidRequestHeaders() {
+async function paidRequestHeaders() {
   const headers = { 'content-type': 'application/json' }
+  const token = await authClient?.accessToken()
+  if (!token) {
+    handleExpiredSession('Your session expired. Please sign in again.')
+    throw new Error('Sign in with email or Google to continue.')
+  }
+  headers.authorization = 'Bearer ' + token
   const accessCode = accessCodeInput.value.trim()
   if (accessCode) headers['x-demo-access-code'] = accessCode
   return headers
