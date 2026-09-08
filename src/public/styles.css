@@ -37,7 +37,7 @@ body {
   margin: 0;
   overflow-x: hidden;
   background:
-    linear-gradient(180deg, #07111f 0, #0a1727 560px, var(--canvas) 560px, var(--canvas) 100%);
+    linear-gradient(180deg, #07111f 0, #0a1727 640px, var(--canvas) 640px, var(--canvas) 100%);
 }
 
 body::before {
@@ -1586,7 +1586,7 @@ body.shared-view #research-view {
 @media (max-width: 960px) {
   body {
     background:
-      linear-gradient(180deg, #07111f 0, #0a1727 590px, var(--canvas) 590px, var(--canvas) 100%);
+      linear-gradient(180deg, #07111f 0, #0a1727 690px, var(--canvas) 690px, var(--canvas) 100%);
   }
 
   .intro {
@@ -1610,7 +1610,7 @@ body.shared-view #research-view {
 @media (max-width: 640px) {
   body {
     background:
-      linear-gradient(180deg, #07111f 0, #0a1727 650px, var(--canvas) 650px, var(--canvas) 100%);
+      linear-gradient(180deg, #07111f 0, #0a1727 760px, var(--canvas) 760px, var(--canvas) 100%);
   }
 
   .header-inner,
