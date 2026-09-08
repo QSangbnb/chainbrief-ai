@@ -282,29 +282,6 @@ h2 {
   line-height: 1.65;
 }
 
-.capability-list {
-  display: flex;
-  gap: 9px;
-  flex-wrap: wrap;
-}
-
-.capability-list span {
-  border: 1px solid rgb(255 255 255 / 0.1);
-  border-radius: 999px;
-  background: rgb(255 255 255 / 0.05);
-  color: #cfdae7;
-  padding: 8px 11px;
-  font-size: 0.73rem;
-  font-weight: 680;
-}
-
-.capability-list span::before {
-  margin-right: 7px;
-  color: #4fe0c9;
-  content: "●";
-  font-size: 0.56rem;
-}
-
 .trust-banner {
   display: flex;
   min-height: 54px;
@@ -1675,14 +1652,6 @@ body.shared-view #research-view {
 
   .lede {
     font-size: 0.98rem;
-  }
-
-  .capability-list {
-    gap: 7px;
-  }
-
-  .capability-list span {
-    font-size: 0.67rem;
   }
 
   .trust-banner {
