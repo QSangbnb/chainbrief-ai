@@ -8,6 +8,7 @@ import {
   createDeterministicFallbackDraft,
   normalizeSocialPostText,
   sanitizeSocialDraft,
+  shortenThreadsDraft,
   shortenXDraft,
 } from '../dist/lib/social.js'
 
@@ -118,6 +119,14 @@ test('shortens X drafts deterministically to 280 characters', () => {
   )
 
   assert.equal([...draft].length <= 280, true)
+})
+
+test('shortens Threads drafts deterministically to 500 characters', () => {
+  const draft = shortenThreadsDraft(
+    'Orbio is researched against its official domain and supplied Robinhood Chain contract. '.repeat(12),
+  )
+
+  assert.equal([...draft].length <= 500, true)
 })
 
 test('normalizes serialized Binance Square JSON into clean post text', () => {

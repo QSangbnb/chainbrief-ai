@@ -12,7 +12,7 @@ export const SocialDraftRequest = z.object({
   }),
   report: z.string().trim().min(50).max(12000),
   language: z.enum(['en', 'vi']),
-  channel: z.enum(['x', 'binance']),
+  channel: z.enum(['x', 'binance', 'threads']),
 })
 
 export type SocialChannel = z.infer<typeof SocialDraftRequest>['channel']
@@ -37,7 +37,7 @@ const KNOWN_CHAINS = [
   'Bitcoin',
 ]
 const SYMBOL_ALLOWLIST = new Set(['AI', 'API', 'DAO', 'DEX', 'ID', 'NFA', 'NFT', 'TVL', 'URL', 'USD', 'USDC', 'USDT', 'BTC', 'ETH'])
-const MIN_FALLBACK_LENGTH = { x: 70, binance: 140 } as const
+const MIN_FALLBACK_LENGTH = { x: 70, binance: 140, threads: 100 } as const
 
 export function socialPrompt(args: {
   identity: IdentityVerifiedData
@@ -46,11 +46,13 @@ export function socialPrompt(args: {
   channel: SocialChannel
 }) {
   const languageName = args.language === 'vi' ? 'Vietnamese' : 'English'
-  const platform = args.channel === 'x' ? 'X' : 'Binance Square'
+  const platform = args.channel === 'x' ? 'X' : args.channel === 'threads' ? 'Threads' : 'Binance Square'
   const lengthRule =
     args.channel === 'x'
       ? 'Stay within 280 characters. Use a natural hook first and focus on one or two useful verified insights.'
-      : 'May be longer. Include a hook, useful explanation, verified facts, risks already present in the report, and a short disclaimer.'
+      : args.channel === 'threads'
+        ? 'Stay within 500 characters. Use a conversational hook, two or three useful verified insights, and a short disclaimer.'
+        : 'May be longer. Include a hook, useful explanation, verified facts, risks already present in the report, and a short disclaimer.'
 
   return [
     `Write one ${platform} draft entirely in ${languageName}.`,
@@ -110,6 +112,7 @@ export function sanitizeSocialDraft(args: {
   }
 
   if (args.channel === 'x') draft = shortenXDraft(draft)
+  if (args.channel === 'threads') draft = shortenThreadsDraft(draft)
 
   return {
     draft,
@@ -128,6 +131,9 @@ export function validateSocialDraft(args: {
   const sanitized = sanitizeSocialDraft({ ...args, language: 'en' })
   if (sanitized.removedReasons.length > 0) return { ok: false as const, reason: sanitized.removedReasons[0] }
   if (args.channel === 'x' && [...args.draft].length > 280) return { ok: false as const, reason: 'x_character_limit_exceeded' }
+  if (args.channel === 'threads' && [...args.draft].length > 500) {
+    return { ok: false as const, reason: 'threads_character_limit_exceeded' }
+  }
   return { ok: true as const }
 }
 
@@ -151,6 +157,15 @@ export function createDeterministicFallbackDraft(args: {
         : `${name}: research note based on ${identityFacts.join(' and ') || 'verified identity'}.`
     const notice = args.language === 'vi' ? 'Không phải lời khuyên tài chính.' : 'Not financial advice.'
     return shortenXDraft([lead, summary[0], notice].filter(Boolean).join(' '))
+  }
+
+  if (args.channel === 'threads') {
+    const lead =
+      args.language === 'vi'
+        ? `${name}: vài điểm đáng chú ý từ nguồn đã xác minh.`
+        : `${name}: a few useful takeaways from verified sources.`
+    const notice = args.language === 'vi' ? 'Không phải lời khuyên tài chính.' : 'Not financial advice.'
+    return shortenThreadsDraft([lead, ...summary, notice].filter(Boolean).join(' '))
   }
 
   const hook =
@@ -189,6 +204,12 @@ export function shortenXDraft(draft: string) {
   if (candidate && [...candidate].length <= 280) return candidate
 
   return `${normalized.slice(0, 276).trimEnd()}...`
+}
+
+export function shortenThreadsDraft(draft: string) {
+  const normalized = draft.replace(/\s+/g, ' ').trim()
+  if ([...normalized].length <= 500) return normalized
+  return `${[...normalized].slice(0, 496).join('').trimEnd()}...`
 }
 
 export function approvalInitialState() {

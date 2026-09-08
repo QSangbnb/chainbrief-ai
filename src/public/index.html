@@ -68,7 +68,22 @@
         <span class="trust-note">Sources stay visible</span>
       </section>
 
-      <section class="workspace">
+      <nav id="workspace-nav" class="workspace-nav" aria-label="ChainBrief workspace">
+        <button class="workspace-tab active" type="button" data-view="research">New research</button>
+        <button class="workspace-tab" type="button" data-view="history">History</button>
+        <button class="workspace-tab" type="button" data-view="watchlist">Watchlist</button>
+        <button id="admin-tab" class="workspace-tab hidden" type="button" data-view="admin">Admin</button>
+      </nav>
+
+      <section id="shared-notice" class="shared-notice hidden">
+        <div>
+          <span class="panel-kicker">Shared research</span>
+          <strong id="shared-title">ChainBrief report</strong>
+        </div>
+        <a class="secondary" href="/">Create your own brief</a>
+      </section>
+
+      <section id="research-view" class="workspace app-view">
         <form id="research-form" class="panel composer">
           <div class="panel-heading">
             <span class="panel-kicker">New brief</span>
@@ -209,13 +224,20 @@
                 <div>
                   <span class="panel-kicker">Completed brief</span>
                   <h2>Report</h2>
+                  <p id="report-generated-at" class="report-generated-at"></p>
                 </div>
-                <button id="copy-report" type="button" class="secondary">
-                  <svg viewBox="0 0 20 20" aria-hidden="true">
-                    <path d="M7 6V4h9v9h-2M4 7h9v9H4z" />
-                  </svg>
-                  <span>Copy report</span>
-                </button>
+                <div class="report-actions">
+                  <button id="watch-report" type="button" class="secondary">Add to watchlist</button>
+                  <button id="download-report" type="button" class="secondary">Markdown</button>
+                  <button id="print-report" type="button" class="secondary">PDF</button>
+                  <button id="share-report" type="button" class="secondary">Share</button>
+                  <button id="copy-report" type="button" class="secondary">
+                    <svg viewBox="0 0 20 20" aria-hidden="true">
+                      <path d="M7 6V4h9v9h-2M4 7h9v9H4z" />
+                    </svg>
+                    <span>Copy</span>
+                  </button>
+                </div>
               </div>
 
               <article id="report" class="report"></article>
@@ -231,6 +253,9 @@
                   </button>
                   <button id="binance-post-button" type="button" class="secondary" data-channel="binance">
                     Generate Binance Square post
+                  </button>
+                  <button id="threads-post-button" type="button" class="secondary" data-channel="threads">
+                    Generate Threads post
                   </button>
                 </div>
               </div>
@@ -261,6 +286,49 @@
           <button id="copy-post" type="button" class="secondary" disabled>Copy post</button>
         </div>
       </section>
+
+      <section id="history-view" class="panel feature-view app-view hidden" aria-live="polite">
+        <div class="feature-heading">
+          <div>
+            <span class="panel-kicker">Research library</span>
+            <h2>Your saved briefs</h2>
+            <p>Open, rename, share, export, or remove your previous research.</p>
+          </div>
+          <label class="feature-search">
+            <span class="sr-only">Search saved briefs</span>
+            <input id="history-search" type="search" maxlength="80" placeholder="Search history..." />
+          </label>
+        </div>
+        <p id="history-message" class="feature-message"></p>
+        <div id="history-list" class="feature-list"></div>
+      </section>
+
+      <section id="watchlist-view" class="panel feature-view app-view hidden" aria-live="polite">
+        <div class="feature-heading">
+          <div>
+            <span class="panel-kicker">Tracked projects</span>
+            <h2>Your watchlist</h2>
+            <p>Save verified identities and run a fresh evidence check whenever you need one.</p>
+          </div>
+        </div>
+        <p id="watchlist-message" class="feature-message"></p>
+        <div id="watchlist-list" class="feature-list"></div>
+      </section>
+
+      <section id="admin-view" class="panel feature-view app-view hidden" aria-live="polite">
+        <div class="feature-heading">
+          <div>
+            <span class="panel-kicker">Operations</span>
+            <h2>Service overview</h2>
+            <p>Live runtime, AI request, concurrency, and OpenRouter key metrics.</p>
+          </div>
+          <button id="refresh-admin" type="button" class="secondary">Refresh</button>
+        </div>
+        <p id="admin-message" class="feature-message"></p>
+        <div id="admin-metrics" class="metrics-grid"></div>
+      </section>
+
+      <div id="toast" class="toast hidden" role="status"></div>
 
       <footer class="site-footer">
         <span>ChainBrief AI</span>
