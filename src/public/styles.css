@@ -107,7 +107,7 @@ a {
 }
 
 .brand,
-.github-link {
+.auth-button {
   display: inline-flex;
   align-items: center;
   text-decoration: none;
@@ -154,7 +154,7 @@ a {
 }
 
 .network-status,
-.github-link {
+.auth-button {
   min-height: 38px;
   border: 1px solid rgb(255 255 255 / 0.11);
   border-radius: 999px;
@@ -182,7 +182,7 @@ a {
   box-shadow: 0 0 0 4px rgb(37 215 166 / 0.12);
 }
 
-.github-link {
+.auth-button {
   gap: 7px;
   transition:
     border-color 180ms ease,
@@ -190,15 +190,24 @@ a {
     transform 180ms ease;
 }
 
-.github-link:hover {
+.auth-button:hover {
   border-color: rgb(105 234 216 / 0.35);
   background: rgb(255 255 255 / 0.09);
   transform: translateY(-1px);
 }
 
-.github-link svg {
+.auth-button svg {
   width: 17px;
-  fill: currentColor;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-width: 1.7;
+}
+
+.auth-button.is-authenticated {
+  border-color: rgb(105 234 216 / 0.25);
+  background: rgb(16 184 166 / 0.11);
+  color: #b8f4e8;
 }
 
 .shell {
@@ -600,6 +609,33 @@ button:disabled {
 
 .field-error {
   margin: 12px 0 0;
+}
+
+.auth-gate {
+  display: flex;
+  gap: 8px;
+  margin: 13px 0 0;
+  align-items: center;
+  color: #68778a;
+  font-size: 0.7rem;
+  font-weight: 680;
+}
+
+.auth-gate i {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #94a3b8;
+}
+
+.auth-gate.is-authenticated {
+  color: var(--teal-dark);
+}
+
+.auth-gate.is-authenticated i {
+  background: #10b981;
+  box-shadow: 0 0 0 4px rgb(16 185 129 / 0.1);
 }
 
 .composer-footer {
@@ -1071,6 +1107,246 @@ button:disabled {
   text-underline-offset: 3px;
 }
 
+body.auth-open {
+  overflow: hidden;
+}
+
+.auth-modal {
+  display: grid;
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  place-items: center;
+  padding: 20px;
+}
+
+.auth-backdrop {
+  position: absolute;
+  min-height: 0;
+  inset: 0;
+  border-radius: 0;
+  background: rgb(3 12 24 / 0.72);
+  padding: 0;
+  backdrop-filter: blur(9px);
+}
+
+.auth-backdrop:hover:not(:disabled) {
+  transform: none;
+}
+
+.auth-card {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 470px);
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  border: 1px solid rgb(214 224 234 / 0.9);
+  border-radius: 24px;
+  background: #ffffff;
+  padding: 31px;
+  box-shadow: 0 34px 100px rgb(0 0 0 / 0.34);
+}
+
+.auth-close {
+  display: grid;
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  width: 36px;
+  min-height: 36px;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: #f8fafc;
+  color: #58677a;
+  padding: 0;
+  font-size: 1.3rem;
+  font-weight: 450;
+}
+
+.auth-brand {
+  margin-bottom: 20px;
+}
+
+.auth-brand .brand-mark {
+  width: 44px;
+  height: 44px;
+  background: linear-gradient(145deg, #0d2634, #0c5355);
+}
+
+.auth-heading h2,
+.account-view h2 {
+  margin: 8px 0 8px;
+  font-size: 1.55rem;
+}
+
+.auth-heading p,
+.auth-privacy,
+.account-view p {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.auth-heading p {
+  margin-bottom: 22px;
+  font-size: 0.85rem;
+}
+
+.google-button {
+  display: flex;
+  width: 100%;
+  gap: 11px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line-strong);
+  background: #ffffff;
+  color: var(--ink-soft);
+}
+
+.google-button:hover:not(:disabled) {
+  border-color: #aebdcc;
+  background: #f8fafc;
+}
+
+.google-button svg {
+  width: 19px;
+}
+
+.google-button path:nth-child(1) { fill: #4285f4; }
+.google-button path:nth-child(2) { fill: #34a853; }
+.google-button path:nth-child(3) { fill: #fbbc05; }
+.google-button path:nth-child(4) { fill: #ea4335; }
+
+.auth-divider {
+  display: flex;
+  margin: 21px 0;
+  align-items: center;
+  color: #98a2b3;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  height: 1px;
+  flex: 1;
+  background: var(--line);
+  content: "";
+}
+
+.auth-divider span {
+  padding: 0 12px;
+}
+
+.auth-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  margin-bottom: 18px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--surface-soft);
+  padding: 4px;
+}
+
+.auth-tabs button {
+  min-height: 37px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.auth-tabs button.active {
+  border: 1px solid #d5dee8;
+  background: #ffffff;
+  color: var(--ink);
+  box-shadow: var(--shadow-sm);
+}
+
+.email-auth-form {
+  display: grid;
+  gap: 8px;
+}
+
+.email-auth-form label {
+  margin-top: 4px;
+  color: var(--ink-soft);
+  font-size: 0.75rem;
+  font-weight: 760;
+}
+
+.email-auth-form input {
+  width: 100%;
+  min-height: 46px;
+  border: 1px solid var(--line-strong);
+  border-radius: 11px;
+  background: #fbfcfd;
+  color: var(--ink);
+  padding: 0 13px;
+}
+
+.email-auth-form input:focus {
+  border-color: var(--teal);
+  background: #ffffff;
+  box-shadow: 0 0 0 4px rgb(16 184 166 / 0.1);
+  outline: none;
+}
+
+.auth-submit {
+  width: 100%;
+  margin-top: 10px;
+}
+
+.auth-message {
+  min-height: 20px;
+  margin: 14px 0 0;
+  color: var(--teal-dark);
+  font-size: 0.75rem;
+  font-weight: 690;
+  line-height: 1.5;
+}
+
+.auth-message.is-error {
+  color: var(--danger);
+}
+
+.auth-privacy {
+  margin: 12px 0 0;
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+  font-size: 0.67rem;
+}
+
+.account-view {
+  display: grid;
+  justify-items: center;
+  padding: 18px 0 4px;
+  text-align: center;
+}
+
+.account-avatar {
+  display: grid;
+  width: 64px;
+  height: 64px;
+  margin-bottom: 18px;
+  place-items: center;
+  border: 1px solid #a8e1d8;
+  border-radius: 50%;
+  background: var(--teal-pale);
+  color: var(--teal-dark);
+  font-size: 1.45rem;
+  font-weight: 820;
+}
+
+.account-view p {
+  margin: 0 0 22px;
+  font-size: 0.86rem;
+}
+
+.account-sign-out {
+  min-width: 150px;
+}
+
 .hidden {
   display: none !important;
 }
@@ -1143,14 +1419,19 @@ button:disabled {
     display: none;
   }
 
-  .github-link {
+  .auth-button {
     width: 40px;
     padding: 0;
     justify-content: center;
   }
 
-  .github-link span {
+  .auth-button span {
     display: none;
+  }
+
+  .auth-card {
+    border-radius: 20px;
+    padding: 25px 20px;
   }
 
   .intro {

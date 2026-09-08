@@ -7,6 +7,7 @@ This project is research-only. It never publishes social posts, never connects t
 ## Features
 
 - English and Vietnamese research reports.
+- Required Supabase authentication with email/password or Google before paid research endpoints can be used.
 - Optional identity constraint field for official URL, contract address, or blockchain.
 - Web-grounded research through OpenRouter server-side web search.
 - Entity-resolution guardrails for same-name crypto projects.
@@ -17,15 +18,17 @@ This project is research-only. It never publishes social posts, never connects t
 - Human approval workflow before copying a generated social draft.
 - Draft factual sanitizer that removes unsupported hard facts and keeps the research report visible.
 - `/api/health` endpoint for non-paid server/config/OpenRouter connectivity checks.
-- Optional `DEMO_ACCESS_CODE` protection for paid endpoints when deployed publicly.
+- Server-side validation of every Supabase access token before `/api/research` or `/api/social` runs.
+- Optional `DEMO_ACCESS_CODE` protection as an additional private-demo gate.
 
 ## Architecture
 
 - `src/server.ts` runs a small TypeScript HTTP server.
 - `src/lib/openrouter.ts` loads `.env.local` server-side and creates the OpenRouter client.
+- `src/lib/auth.ts` validates Supabase bearer tokens server-side before paid work begins.
 - `src/lib/identity.ts` handles identity hints, URL canonicalization, verified identity extraction, and conflict detection.
 - `src/lib/social.ts` normalizes social model output, validates hard facts, shortens X drafts, and creates deterministic fallbacks.
-- `src/public/` contains the browser UI. It never reads `OPENROUTER_API_KEY`.
+- `src/public/` contains the browser UI and Supabase session client. It never reads `OPENROUTER_API_KEY`.
 - `tests/` contains mocked regression tests for identity resolution, report normalization, social draft safety, and UI behavior checks.
 
 The browser sends requests only to the local server. The server is the only place that can access OpenRouter credentials.
@@ -38,6 +41,7 @@ Requirements:
 - Node.js 22 or newer
 - pnpm
 - An OpenRouter API key stored in `.env.local`
+- A Supabase project with email and/or Google authentication enabled
 
 Install dependencies:
 
@@ -59,6 +63,8 @@ Required:
 
 ```env
 OPENROUTER_API_KEY=
+SUPABASE_URL=https://your-project-ref.supabase.co
+SUPABASE_PUBLISHABLE_KEY=sb_publishable_your_public_key
 ```
 
 Optional:
@@ -73,7 +79,7 @@ PAID_CONCURRENCY_MAX=2
 PORT=5173
 ```
 
-`DEMO_ACCESS_CODE` is optional. When set, `/api/research` and `/api/social` require the same value in the `x-demo-access-code` request header. The local UI includes a password field for this value.
+`SUPABASE_PUBLISHABLE_KEY` is designed to be public. Never place a Supabase `service_role` or secret key in this application. `DEMO_ACCESS_CODE` is optional; when set, it acts as an additional gate after Supabase authentication.
 
 ## Development
 
@@ -112,7 +118,7 @@ Start:
 pnpm.cmd start
 ```
 
-Use a process manager or platform runtime to keep the process alive. Set `DEMO_ACCESS_CODE` before public demos if you need to limit use of paid endpoints.
+Use a process manager or platform runtime to keep the process alive. Configure the production Site URL and redirect URL in Supabase Auth, then set `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` on the hosting platform.
 
 ## Health Check
 
@@ -120,6 +126,7 @@ Use a process manager or platform runtime to keep the process alive. Set `DEMO_A
 
 - server status and port
 - whether OpenRouter configuration is present
+- whether Supabase authentication is configured
 - whether demo access-code protection is enabled
 - non-generation OpenRouter connectivity via `GET /api/v1/models`
 
@@ -128,6 +135,8 @@ The health endpoint does not expose secrets and does not make a paid model reque
 ## Safety Design
 
 - `OPENROUTER_API_KEY` is loaded only on the server.
+- `/api/research` and `/api/social` fail closed unless a valid Supabase session is verified server-side.
+- Only the public Supabase URL and publishable key are exposed to the browser; service-role keys are never used.
 - `.env.local` is ignored by Git.
 - API responses and logs redact OpenRouter key patterns and bearer tokens.
 - Paid endpoints have request-size limits, per-client rate limiting, safe concurrency limits, and request timeouts.

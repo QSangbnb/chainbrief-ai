@@ -12,6 +12,9 @@ export default tseslint.config(js.configs.recommended, ...tseslint.configs.recom
       FormData: 'readonly',
       navigator: 'readonly',
       window: 'readonly',
+      localStorage: 'readonly',
+      URL: 'readonly',
+      URLSearchParams: 'readonly',
     },
   },
 })

@@ -5,6 +5,7 @@ import { isIP } from 'node:net'
 import { extname, join, normalize } from 'node:path'
 import { config } from 'dotenv'
 import { z } from 'zod'
+import { authenticateSupabaseRequest, getSupabaseAuthConfig } from './lib/auth.js'
 import {
   DisambiguationCandidate,
   detectIdentityConflict,
@@ -120,6 +121,11 @@ const server = createServer(async (req, res) => {
       return
     }
 
+    if (req.method === 'GET' && url.pathname === '/api/auth/config') {
+      handleAuthConfig(res)
+      return
+    }
+
     if (req.method === 'GET') {
       await serveStatic(url.pathname, res)
       return
@@ -179,6 +185,13 @@ async function handlePaidEndpoint(
   endpoint: 'research' | 'social',
   handler: () => Promise<void>,
 ) {
+  const authentication = await authenticateSupabaseRequest(req.headers.authorization)
+  if (!authentication.ok) {
+    logSafe('warning', authentication.status, `authentication_denied endpoint=/${endpoint} reason=${authentication.logMessage}`)
+    sendJson(res, authentication.status, { error: authentication.message })
+    return
+  }
+
   if (!checkDemoAccessCode(req)) {
     logSafe('warning', 401, `paid_endpoint_access_denied endpoint=/${endpoint}`)
     sendJson(res, 401, { error: 'Access code required for this public demo.' })
@@ -207,6 +220,7 @@ async function handlePaidEndpoint(
 
 async function handleHealth(res: ServerResponse) {
   const key = process.env.OPENROUTER_API_KEY ?? ''
+  const authConfig = getSupabaseAuthConfig()
   const connectivity = await checkOpenRouterConnectivity()
   sendJson(res, 200, {
     server: {
@@ -216,10 +230,25 @@ async function handleHealth(res: ServerResponse) {
     configuration: {
       envLoaded: Boolean(key),
       openrouterApiKeyConfigured: Boolean(key),
+      authenticationRequired: true,
+      supabaseConfigured: Boolean(authConfig),
       demoAccessCodeRequired: Boolean(process.env.DEMO_ACCESS_CODE),
       model: process.env.OPENROUTER_MODEL ?? 'anthropic/claude-sonnet-4.5',
     },
     openrouter: connectivity,
+  })
+}
+
+function handleAuthConfig(res: ServerResponse) {
+  const authConfig = getSupabaseAuthConfig()
+  if (!authConfig) {
+    sendJson(res, 503, { error: 'Sign-in is being configured. Please try again shortly.' })
+    return
+  }
+
+  sendJson(res, 200, {
+    supabaseUrl: authConfig.url,
+    supabasePublishableKey: authConfig.publishableKey,
   })
 }
 
