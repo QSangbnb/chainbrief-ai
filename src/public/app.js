@@ -95,6 +95,9 @@ googleSignIn.addEventListener('click', () => {
 })
 emailAuthForm.addEventListener('submit', handleEmailAuth)
 signOutButton.addEventListener('click', handleSignOut)
+window.addEventListener('chainbrief-session-expired', () => {
+  handleExpiredSession('Your session expired after 3 days without activity. Please sign in again.')
+})
 for (const tab of workspaceTabs) tab.addEventListener('click', () => showAppView(tab.dataset.view))
 historySearch.addEventListener('input', () => {
   window.clearTimeout(historySearchTimer)
