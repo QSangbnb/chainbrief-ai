@@ -79,6 +79,11 @@ export function listBriefs(authorization: AuthorizationHeader, search = '') {
   return userDatabaseRequest<StoredBriefSummary[]>(authorization, `briefs?${query}`)
 }
 
+export async function checkWorkspaceAvailable(authorization: AuthorizationHeader) {
+  await userDatabaseRequest(authorization, 'briefs?select=id&limit=1', { method: 'HEAD' })
+  return true
+}
+
 export async function getBrief(authorization: AuthorizationHeader, id: string) {
   const query = new URLSearchParams({
     select: 'id,title,query,identity_hint,language,result,report_text,is_public,public_slug,created_at,updated_at',

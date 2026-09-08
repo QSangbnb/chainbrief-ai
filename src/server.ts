@@ -22,6 +22,7 @@ import {
 import { normalizeSocialPostText, sanitizeSocialDraft, SocialDraftRequest, socialPrompt, type SocialChannel } from './lib/social.js'
 import {
   addWatchlistItem,
+  checkWorkspaceAvailable,
   deleteBrief,
   deleteWatchlistItem,
   getBrief,
@@ -147,8 +148,14 @@ const server = createServer(async (req, res) => {
     }
 
     if (req.method === 'GET' && url.pathname === '/api/account') {
-      await handleAuthenticatedEndpoint(req, res, (user) => {
-        sendJson(res, 200, { user, isAdmin: isAdminUser(user) })
+      await handleAuthenticatedEndpoint(req, res, async (user) => {
+        let workspaceReady = false
+        try {
+          workspaceReady = await checkWorkspaceAvailable(req.headers.authorization)
+        } catch (error) {
+          logSafe('warning', storageStatus(error), storageLogMessage(error, 'workspace readiness check failed'))
+        }
+        sendJson(res, 200, { user, isAdmin: isAdminUser(user), workspaceReady })
       })
       return
     }

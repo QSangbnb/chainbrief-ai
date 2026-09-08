@@ -52,6 +52,8 @@ const signOutButton = document.querySelector('#sign-out-button')
 const workspaceTabs = document.querySelectorAll('[data-view]')
 const appViews = document.querySelectorAll('.app-view')
 const adminTab = document.querySelector('#admin-tab')
+const historyTab = document.querySelector('#history-tab')
+const watchlistTab = document.querySelector('#watchlist-tab')
 const historySearch = document.querySelector('#history-search')
 const historyMessage = document.querySelector('#history-message')
 const historyList = document.querySelector('#history-list')
@@ -593,9 +595,13 @@ async function loadAccountCapabilities() {
     const body = await authenticatedJson('/api/account')
     currentUserIsAdmin = Boolean(body.isAdmin)
     adminTab.classList.toggle('hidden', !currentUserIsAdmin)
+    historyTab.classList.toggle('hidden', !body.workspaceReady)
+    watchlistTab.classList.toggle('hidden', !body.workspaceReady)
   } catch (error) {
     currentUserIsAdmin = false
     adminTab.classList.add('hidden')
+    historyTab.classList.add('hidden')
+    watchlistTab.classList.add('hidden')
     if (error instanceof Error && /session expired/i.test(error.message)) handleExpiredSession(error.message)
   }
 }
@@ -1002,6 +1008,8 @@ async function handleSignOut() {
     currentBriefId = null
     currentUserIsAdmin = false
     adminTab.classList.add('hidden')
+    historyTab.classList.add('hidden')
+    watchlistTab.classList.add('hidden')
     historyList.replaceChildren()
     watchlistList.replaceChildren()
     socialPanel.classList.add('hidden')
