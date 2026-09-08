@@ -72,7 +72,6 @@
         <button class="workspace-tab active" type="button" data-view="research">New research</button>
         <button id="history-tab" class="workspace-tab hidden" type="button" data-view="history">History</button>
         <button id="watchlist-tab" class="workspace-tab hidden" type="button" data-view="watchlist">Watchlist</button>
-        <button id="admin-tab" class="workspace-tab hidden" type="button" data-view="admin">Admin</button>
       </nav>
 
       <section id="shared-notice" class="shared-notice hidden">
@@ -313,19 +312,6 @@
         </div>
         <p id="watchlist-message" class="feature-message"></p>
         <div id="watchlist-list" class="feature-list"></div>
-      </section>
-
-      <section id="admin-view" class="panel feature-view app-view hidden" aria-live="polite">
-        <div class="feature-heading">
-          <div>
-            <span class="panel-kicker">Operations</span>
-            <h2>Service overview</h2>
-            <p>Live runtime, AI request, concurrency, and OpenRouter key metrics.</p>
-          </div>
-          <button id="refresh-admin" type="button" class="secondary">Refresh</button>
-        </div>
-        <p id="admin-message" class="feature-message"></p>
-        <div id="admin-metrics" class="metrics-grid"></div>
       </section>
 
       <div id="toast" class="toast hidden" role="status"></div>

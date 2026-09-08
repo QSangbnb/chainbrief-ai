@@ -1531,36 +1531,6 @@ body.auth-open {
   color: var(--danger) !important;
 }
 
-.metrics-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-  margin-top: 16px;
-}
-
-.metric-card {
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: var(--surface-soft);
-  padding: 17px;
-}
-
-.metric-card span {
-  display: block;
-  color: var(--muted);
-  font-size: 0.66rem;
-  font-weight: 760;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-
-.metric-card strong {
-  display: block;
-  margin-top: 7px;
-  color: var(--ink);
-  font-size: 1.35rem;
-}
-
 .toast {
   position: fixed;
   z-index: 30;
@@ -1658,9 +1628,6 @@ body.shared-view #research-view {
     min-height: 560px;
   }
 
-  .metrics-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }
 
 @media (max-width: 640px) {
@@ -1793,10 +1760,6 @@ body.shared-view #research-view {
 
   .feature-search input {
     width: 100%;
-  }
-
-  .metrics-grid {
-    grid-template-columns: 1fr;
   }
 
   .identity-panel dl {

@@ -51,7 +51,6 @@ const authMessage = document.querySelector('#auth-message')
 const signOutButton = document.querySelector('#sign-out-button')
 const workspaceTabs = document.querySelectorAll('[data-view]')
 const appViews = document.querySelectorAll('.app-view')
-const adminTab = document.querySelector('#admin-tab')
 const historyTab = document.querySelector('#history-tab')
 const watchlistTab = document.querySelector('#watchlist-tab')
 const historySearch = document.querySelector('#history-search')
@@ -59,9 +58,6 @@ const historyMessage = document.querySelector('#history-message')
 const historyList = document.querySelector('#history-list')
 const watchlistMessage = document.querySelector('#watchlist-message')
 const watchlistList = document.querySelector('#watchlist-list')
-const refreshAdminButton = document.querySelector('#refresh-admin')
-const adminMessage = document.querySelector('#admin-message')
-const adminMetrics = document.querySelector('#admin-metrics')
 const sharedNotice = document.querySelector('#shared-notice')
 const sharedTitle = document.querySelector('#shared-title')
 const toast = document.querySelector('#toast')
@@ -77,7 +73,6 @@ let draftApproved = false
 let currentSocialChannel = null
 let authClient = null
 let currentUser = null
-let currentUserIsAdmin = false
 let authMode = 'sign-in'
 let authConfigurationError = ''
 let toastTimer = null
@@ -105,7 +100,6 @@ historySearch.addEventListener('input', () => {
   window.clearTimeout(historySearchTimer)
   historySearchTimer = window.setTimeout(() => loadHistory(historySearch.value.trim()), 250)
 })
-refreshAdminButton.addEventListener('click', loadAdminOverview)
 document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && !authModal.classList.contains('hidden')) closeAuthModal()
 })
@@ -610,13 +604,9 @@ async function loadAccountCapabilities() {
   if (!currentUser) return
   try {
     const body = await authenticatedJson('/api/account')
-    currentUserIsAdmin = Boolean(body.isAdmin)
-    adminTab.classList.toggle('hidden', !currentUserIsAdmin)
     historyTab.classList.toggle('hidden', !body.workspaceReady)
     watchlistTab.classList.toggle('hidden', !body.workspaceReady)
   } catch (error) {
-    currentUserIsAdmin = false
-    adminTab.classList.add('hidden')
     historyTab.classList.add('hidden')
     watchlistTab.classList.add('hidden')
     if (error instanceof Error && /session expired/i.test(error.message)) handleExpiredSession(error.message)
@@ -628,15 +618,12 @@ async function showAppView(view, force = false) {
     openAuthModal('Sign in to open your saved workspace.')
     return
   }
-  if (view === 'admin' && !currentUserIsAdmin) return
-
   for (const tab of workspaceTabs) tab.classList.toggle('active', tab.dataset.view === view)
   for (const panel of appViews) panel.classList.toggle('hidden', panel.id !== `${view}-view`)
   socialPanel.classList.toggle('hidden', view !== 'research' || !pendingPost)
 
   if (view === 'history') await loadHistory(historySearch.value.trim())
   if (view === 'watchlist') await loadWatchlist()
-  if (view === 'admin') await loadAdminOverview()
 }
 
 async function loadHistory(search = '', silent = false) {
@@ -811,50 +798,6 @@ async function removeWatchlistItem(item) {
   }
 }
 
-async function loadAdminOverview() {
-  if (!currentUserIsAdmin) return
-  adminMessage.textContent = 'Loading live service metrics...'
-  refreshAdminButton.disabled = true
-  try {
-    const body = await authenticatedJson('/api/admin/overview')
-    renderAdminOverview(body)
-    adminMessage.textContent = `Runtime started ${formatDate(body.startedAt)}. Runtime counters reset when Render restarts.`
-  } catch (error) {
-    adminMetrics.replaceChildren()
-    adminMessage.textContent = error instanceof Error ? error.message : 'Could not load the admin overview.'
-  } finally {
-    refreshAdminButton.disabled = false
-  }
-}
-
-function renderAdminOverview(data) {
-  const researchTotal = (data.metrics?.research?.succeeded || 0) + (data.metrics?.research?.failed || 0)
-  const socialTotal = (data.metrics?.social?.succeeded || 0) + (data.metrics?.social?.failed || 0)
-  const latencyTotal = (data.metrics?.research?.totalLatencyMs || 0) + (data.metrics?.social?.totalLatencyMs || 0)
-  const requestTotal = researchTotal + socialTotal
-  const values = [
-    ['Active requests', `${data.activePaidRequests || 0} / ${data.concurrencyMax || 0}`],
-    ['Research requests', String(researchTotal)],
-    ['Social drafts', String(socialTotal)],
-    ['Failed requests', String((data.metrics?.research?.failed || 0) + (data.metrics?.social?.failed || 0))],
-    ['Average latency', requestTotal ? `${Math.round(latencyTotal / requestTotal / 100) / 10}s` : '—'],
-    ['OpenRouter today', formatCredits(data.openrouter?.usageDaily)],
-    ['OpenRouter month', formatCredits(data.openrouter?.usageMonthly)],
-    ['Key limit remaining', data.openrouter?.limitRemaining == null ? 'No key cap' : formatCredits(data.openrouter.limitRemaining)],
-  ]
-  adminMetrics.replaceChildren()
-  for (const [label, value] of values) {
-    const card = document.createElement('div')
-    card.className = 'metric-card'
-    const name = document.createElement('span')
-    name.textContent = label
-    const amount = document.createElement('strong')
-    amount.textContent = value
-    card.append(name, amount)
-    adminMetrics.append(card)
-  }
-}
-
 async function loadSharedBrief(slug) {
   document.body.classList.add('shared-view')
   sharedNotice.classList.remove('hidden')
@@ -939,10 +882,6 @@ function formatDate(value) {
   }).format(date)
 }
 
-function formatCredits(value) {
-  return typeof value === 'number' ? `$${value.toFixed(4)}` : '—'
-}
-
 function safeFilename(value) {
   return String(value)
     .normalize('NFKD')
@@ -1023,8 +962,6 @@ async function handleSignOut() {
     currentReportText = ''
     currentIdentity = null
     currentBriefId = null
-    currentUserIsAdmin = false
-    adminTab.classList.add('hidden')
     historyTab.classList.add('hidden')
     watchlistTab.classList.add('hidden')
     historyList.replaceChildren()

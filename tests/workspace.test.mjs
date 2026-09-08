@@ -22,22 +22,23 @@ test('workspace API keeps Supabase access scoped to the signed-in bearer token',
 
   assert.match(server, /\/api\/briefs/)
   assert.match(server, /\/api\/watchlist/)
-  assert.match(server, /\/api\/admin\/overview/)
+  assert.doesNotMatch(server, /\/api\/admin\/overview/)
   assert.match(storage, /extractBearerToken\(authorization\)/)
   assert.match(storage, /headers\.set\('authorization', `Bearer \$\{token\}`\)/)
   assert.doesNotMatch(server + storage, /SUPABASE_SERVICE_ROLE_KEY/)
 })
 
-test('workspace UI exposes history, exports, watchlist, admin, and Threads without unsafe HTML', async () => {
+test('workspace UI exposes history, exports, watchlist, and Threads without unsafe HTML', async () => {
   const [html, app] = await Promise.all([
     readFile('src/public/index.html', 'utf8'),
     readFile('src/public/app.js', 'utf8'),
   ])
 
-  for (const id of ['history-view', 'watchlist-view', 'admin-view', 'download-report', 'print-report', 'share-report']) {
+  for (const id of ['history-view', 'watchlist-view', 'download-report', 'print-report', 'share-report']) {
     assert.match(html, new RegExp(`id="${id}"`))
   }
   assert.match(html, /data-channel="threads"/)
+  assert.doesNotMatch(html, /data-view="admin"|id="admin-view"/)
   assert.match(app, /new window\.Blob/)
   assert.match(app, /navigator\.clipboard\.writeText/)
   assert.doesNotMatch(html + app, /innerHTML/)
