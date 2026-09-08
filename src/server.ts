@@ -5,7 +5,7 @@ import { isIP } from 'node:net'
 import { extname, join, normalize } from 'node:path'
 import { config } from 'dotenv'
 import { z } from 'zod'
-import { authenticateSupabaseRequest, getSupabaseAuthConfig } from './lib/auth.js'
+import { authenticateSupabaseRequest, getSupabaseAuthConfig, type AuthenticatedUser } from './lib/auth.js'
 import {
   DisambiguationCandidate,
   detectIdentityConflict,
@@ -20,6 +20,20 @@ import {
   type IdentityConstraints,
 } from './lib/identity.js'
 import { normalizeSocialPostText, sanitizeSocialDraft, SocialDraftRequest, socialPrompt, type SocialChannel } from './lib/social.js'
+import {
+  addWatchlistItem,
+  checkWorkspaceAvailable,
+  deleteBrief,
+  deleteWatchlistItem,
+  getBrief,
+  getSharedBrief,
+  listBriefs,
+  listWatchlist,
+  renameBrief,
+  saveBrief,
+  shareBrief,
+  StorageError,
+} from './lib/storage.js'
 
 config({ path: ['.env.local', '.env'], quiet: true })
 
@@ -28,6 +42,7 @@ const PORT = Number(process.env.PORT ?? 5173)
 const PUBLIC_DIR = join(process.cwd(), 'src', 'public')
 const REDACTED_SECRET_PATTERN = /(?:sk-or-v1-[A-Za-z0-9_-]+|Bearer\s+[A-Za-z0-9._-]+)/g
 const OPENROUTER_MODELS_ENDPOINT = 'https://openrouter.ai/api/v1/models'
+const OPENROUTER_KEY_ENDPOINT = 'https://openrouter.ai/api/v1/key'
 const MAX_REQUEST_BYTES = 64 * 1024
 const PAID_REQUEST_TIMEOUT_MS = 120_000
 const RATE_LIMIT_WINDOW_MS = 60_000
@@ -35,12 +50,28 @@ const RATE_LIMIT_MAX = 8
 const PAID_CONCURRENCY_MAX = Number(process.env.PAID_CONCURRENCY_MAX ?? 2)
 const rateLimitBuckets = new Map<string, { count: number; resetAt: number }>()
 let activePaidRequests = 0
+const serviceStartedAt = new Date().toISOString()
+const serviceMetrics = {
+  research: { succeeded: 0, failed: 0, totalLatencyMs: 0 },
+  social: { succeeded: 0, failed: 0, totalLatencyMs: 0 },
+}
 
 const ResearchRequest = z.object({
   query: z.string().trim().min(2).max(500),
   identityHint: z.string().trim().max(500).optional().default(''),
   language: z.enum(['en', 'vi']),
 })
+
+const BriefTitleRequest = z.object({ title: z.string().trim().min(2).max(120) })
+const WatchlistRequest = z.object({
+  name: z.string().trim().min(1).max(120),
+  symbol: z.string().trim().max(20).nullable().default(null),
+  official_domain: z.string().trim().max(255).nullable().default(null),
+  blockchain: z.string().trim().max(80).nullable().default(null),
+  contract_address: z.string().trim().max(160).nullable().default(null),
+})
+const Uuid = z.uuid()
+const ShareSlug = z.string().regex(/^[A-Za-z0-9_-]{20,40}$/)
 
 const SourceLink = z.object({
   title: z.string().default('Source'),
@@ -107,12 +138,64 @@ const server = createServer(async (req, res) => {
     const url = new URL(req.url, `http://${req.headers.host ?? 'localhost'}`)
 
     if (req.method === 'POST' && url.pathname === '/api/research') {
-      await handlePaidEndpoint(req, res, 'research', () => handleResearch(req, res))
+      await handlePaidEndpoint(req, res, 'research', (user) => handleResearch(req, res, user))
       return
     }
 
     if (req.method === 'POST' && url.pathname === '/api/social') {
       await handlePaidEndpoint(req, res, 'social', () => handleSocial(req, res))
+      return
+    }
+
+    if (req.method === 'GET' && url.pathname === '/api/account') {
+      await handleAuthenticatedEndpoint(req, res, async (user) => {
+        let workspaceReady = false
+        try {
+          workspaceReady = await checkWorkspaceAvailable(req.headers.authorization)
+        } catch (error) {
+          logSafe('warning', storageStatus(error), storageLogMessage(error, 'workspace readiness check failed'))
+        }
+        sendJson(res, 200, { user, isAdmin: isAdminUser(user), workspaceReady })
+      })
+      return
+    }
+
+    if (req.method === 'GET' && url.pathname === '/api/briefs') {
+      await handleAuthenticatedEndpoint(req, res, (user) => handleBriefList(req, res, user, url))
+      return
+    }
+
+    const briefMatch = url.pathname.match(/^\/api\/briefs\/([^/]+)$/)
+    if (briefMatch && (req.method === 'GET' || req.method === 'PATCH' || req.method === 'DELETE')) {
+      await handleAuthenticatedEndpoint(req, res, (user) => handleBriefMutation(req, res, user, briefMatch[1] ?? ''))
+      return
+    }
+
+    const shareMatch = url.pathname.match(/^\/api\/briefs\/([^/]+)\/share$/)
+    if (shareMatch && req.method === 'POST') {
+      await handleAuthenticatedEndpoint(req, res, (user) => handleBriefShare(req, res, user, shareMatch[1] ?? ''))
+      return
+    }
+
+    const publicBriefMatch = url.pathname.match(/^\/api\/shared\/([^/]+)$/)
+    if (publicBriefMatch && req.method === 'GET') {
+      await handleSharedBrief(res, publicBriefMatch[1] ?? '')
+      return
+    }
+
+    if (url.pathname === '/api/watchlist' && (req.method === 'GET' || req.method === 'POST')) {
+      await handleAuthenticatedEndpoint(req, res, (user) => handleWatchlist(req, res, user))
+      return
+    }
+
+    const watchlistMatch = url.pathname.match(/^\/api\/watchlist\/([^/]+)$/)
+    if (watchlistMatch && req.method === 'DELETE') {
+      await handleAuthenticatedEndpoint(req, res, (user) => handleWatchlistDelete(req, res, user, watchlistMatch[1] ?? ''))
+      return
+    }
+
+    if (req.method === 'GET' && url.pathname === '/api/admin/overview') {
+      await handleAuthenticatedEndpoint(req, res, (user) => handleAdminOverview(res, user))
       return
     }
 
@@ -123,6 +206,11 @@ const server = createServer(async (req, res) => {
 
     if (req.method === 'GET' && url.pathname === '/api/auth/config') {
       handleAuthConfig(res)
+      return
+    }
+
+    if (req.method === 'GET' && /^\/share\/[A-Za-z0-9_-]+$/.test(url.pathname)) {
+      await serveStatic('/index.html', res)
       return
     }
 
@@ -146,7 +234,7 @@ server.listen(PORT, () => {
   console.log(`ChainBrief AI is running at http://localhost:${PORT}`)
 })
 
-async function handleResearch(req: IncomingMessage, res: ServerResponse) {
+async function handleResearch(req: IncomingMessage, res: ServerResponse, user: AuthenticatedUser) {
   const payload = ResearchRequest.safeParse(await readJson(req, MAX_REQUEST_BYTES))
   if (!payload.success) {
     sendJson(res, 400, { error: 'Enter at least 2 characters and choose a supported language.' })
@@ -160,7 +248,22 @@ async function handleResearch(req: IncomingMessage, res: ServerResponse) {
   }
 
   const result = await runResearch(payload.data.query, payload.data.identityHint, payload.data.language)
-  sendJson(res, 200, { result })
+  let savedBrief = null
+  if (result.mode !== 'disambiguation') {
+    try {
+      savedBrief = await saveBrief(req.headers.authorization, user, {
+        title: briefTitle(result, payload.data.query),
+        query: payload.data.query,
+        identityHint: payload.data.identityHint,
+        language: payload.data.language,
+        result,
+        reportText: result.text,
+      })
+    } catch (error) {
+      logSafe('warning', storageStatus(error), storageLogMessage(error, 'automatic brief save failed'))
+    }
+  }
+  sendJson(res, 200, { result, savedBrief })
 }
 
 async function handleSocial(req: IncomingMessage, res: ServerResponse) {
@@ -183,7 +286,7 @@ async function handlePaidEndpoint(
   req: IncomingMessage,
   res: ServerResponse,
   endpoint: 'research' | 'social',
-  handler: () => Promise<void>,
+  handler: (user: AuthenticatedUser) => Promise<void>,
 ) {
   const authentication = await authenticateSupabaseRequest(req.headers.authorization)
   if (!authentication.ok) {
@@ -211,10 +314,203 @@ async function handlePaidEndpoint(
   }
 
   activePaidRequests += 1
+  const started = Date.now()
   try {
-    await handler()
+    await handler(authentication.user)
+    serviceMetrics[endpoint].succeeded += 1
+  } catch (error) {
+    serviceMetrics[endpoint].failed += 1
+    throw error
   } finally {
+    serviceMetrics[endpoint].totalLatencyMs += Date.now() - started
     activePaidRequests -= 1
+  }
+}
+
+async function handleAuthenticatedEndpoint(
+  req: IncomingMessage,
+  res: ServerResponse,
+  handler: (user: AuthenticatedUser) => Promise<void> | void,
+) {
+  const authentication = await authenticateSupabaseRequest(req.headers.authorization)
+  if (!authentication.ok) {
+    logSafe('warning', authentication.status, `authentication_denied reason=${authentication.logMessage}`)
+    sendJson(res, authentication.status, { error: authentication.message })
+    return
+  }
+  await handler(authentication.user)
+}
+
+async function handleBriefList(_req: IncomingMessage, res: ServerResponse, _user: AuthenticatedUser, url: URL) {
+  const search = (url.searchParams.get('search') ?? '').trim().slice(0, 80)
+  const briefs = await listBriefs(_req.headers.authorization, search)
+  sendJson(res, 200, { briefs })
+}
+
+async function handleBriefMutation(
+  req: IncomingMessage,
+  res: ServerResponse,
+  _user: AuthenticatedUser,
+  rawId: string,
+) {
+  const id = Uuid.safeParse(rawId)
+  if (!id.success) {
+    sendJson(res, 400, { error: 'Invalid brief identifier.' })
+    return
+  }
+
+  if (req.method === 'DELETE') {
+    await deleteBrief(req.headers.authorization, id.data)
+    sendJson(res, 200, { deleted: true })
+    return
+  }
+
+  if (req.method === 'GET') {
+    const brief = await getBrief(req.headers.authorization, id.data)
+    if (!brief) {
+      sendJson(res, 404, { error: 'Brief not found.' })
+      return
+    }
+    sendJson(res, 200, { brief })
+    return
+  }
+
+  const payload = BriefTitleRequest.safeParse(await readJson(req, MAX_REQUEST_BYTES))
+  if (!payload.success) {
+    sendJson(res, 400, { error: 'Use a title between 2 and 120 characters.' })
+    return
+  }
+  const brief = await renameBrief(req.headers.authorization, id.data, payload.data.title)
+  if (!brief) {
+    sendJson(res, 404, { error: 'Brief not found.' })
+    return
+  }
+  sendJson(res, 200, { brief })
+}
+
+async function handleBriefShare(
+  req: IncomingMessage,
+  res: ServerResponse,
+  _user: AuthenticatedUser,
+  rawId: string,
+) {
+  const id = Uuid.safeParse(rawId)
+  if (!id.success) {
+    sendJson(res, 400, { error: 'Invalid brief identifier.' })
+    return
+  }
+  const brief = await shareBrief(req.headers.authorization, id.data)
+  if (!brief?.public_slug) {
+    sendJson(res, 404, { error: 'Brief not found.' })
+    return
+  }
+  sendJson(res, 200, { url: `/share/${brief.public_slug}` })
+}
+
+async function handleSharedBrief(res: ServerResponse, rawSlug: string) {
+  const slug = ShareSlug.safeParse(rawSlug)
+  if (!slug.success) {
+    sendJson(res, 404, { error: 'Shared brief not found.' })
+    return
+  }
+  const brief = await getSharedBrief(slug.data)
+  if (!brief) {
+    sendJson(res, 404, { error: 'Shared brief not found.' })
+    return
+  }
+  sendJson(res, 200, { brief })
+}
+
+async function handleWatchlist(req: IncomingMessage, res: ServerResponse, user: AuthenticatedUser) {
+  if (req.method === 'GET') {
+    sendJson(res, 200, { items: await listWatchlist(req.headers.authorization) })
+    return
+  }
+
+  const payload = WatchlistRequest.safeParse(await readJson(req, MAX_REQUEST_BYTES))
+  if (!payload.success) {
+    sendJson(res, 400, { error: 'Watchlist item is invalid.' })
+    return
+  }
+  const item = await addWatchlistItem(req.headers.authorization, user, payload.data)
+  sendJson(res, 201, { item })
+}
+
+async function handleWatchlistDelete(
+  req: IncomingMessage,
+  res: ServerResponse,
+  _user: AuthenticatedUser,
+  rawId: string,
+) {
+  const id = Uuid.safeParse(rawId)
+  if (!id.success) {
+    sendJson(res, 400, { error: 'Invalid watchlist identifier.' })
+    return
+  }
+  await deleteWatchlistItem(req.headers.authorization, id.data)
+  sendJson(res, 200, { deleted: true })
+}
+
+async function handleAdminOverview(res: ServerResponse, user: AuthenticatedUser) {
+  if (!isAdminUser(user)) {
+    sendJson(res, 403, { error: 'Administrator access is required.' })
+    return
+  }
+
+  sendJson(res, 200, {
+    startedAt: serviceStartedAt,
+    activePaidRequests,
+    concurrencyMax: PAID_CONCURRENCY_MAX,
+    metrics: serviceMetrics,
+    openrouter: await getOpenRouterKeyOverview(),
+  })
+}
+
+function briefTitle(result: ResearchResult, query: string) {
+  if (result.mode !== 'disambiguation') {
+    const name = result.identity.name?.trim()
+    const symbol = result.identity.symbol?.trim()
+    if (name && symbol) return `${name} (${symbol}) research brief`.slice(0, 120)
+    if (name) return `${name} research brief`.slice(0, 120)
+  }
+  return query.replace(/\s+/g, ' ').trim().slice(0, 120)
+}
+
+function isAdminUser(user: AuthenticatedUser) {
+  const email = user.email?.trim().toLowerCase()
+  if (!email) return false
+  return (process.env.ADMIN_EMAILS ?? '')
+    .split(',')
+    .map((entry) => entry.trim().toLowerCase())
+    .filter(Boolean)
+    .includes(email)
+}
+
+async function getOpenRouterKeyOverview() {
+  const key = process.env.OPENROUTER_API_KEY?.trim()
+  if (!key) return { ok: false, message: 'OpenRouter is not configured.' }
+
+  try {
+    const response = await fetch(OPENROUTER_KEY_ENDPOINT, {
+      headers: { accept: 'application/json', authorization: `Bearer ${key}` },
+      signal: AbortSignal.timeout(10_000),
+    })
+    if (!response.ok) return { ok: false, status: response.status }
+    const payload = (await response.json()) as { data?: Record<string, unknown> }
+    const data = payload.data ?? {}
+    return {
+      ok: true,
+      limit: numberOrNullProperty(data, 'limit'),
+      limitRemaining: numberOrNullProperty(data, 'limit_remaining'),
+      usage: numberOrNullProperty(data, 'usage'),
+      usageDaily: numberOrNullProperty(data, 'usage_daily'),
+      usageWeekly: numberOrNullProperty(data, 'usage_weekly'),
+      usageMonthly: numberOrNullProperty(data, 'usage_monthly'),
+      limitReset: stringProperty(data, 'limit_reset') ?? null,
+      isFreeTier: Boolean(data.is_free_tier),
+    }
+  } catch (error) {
+    return { ok: false, message: `OpenRouter usage check failed: ${errorMessage(error)}` }
   }
 }
 
@@ -684,6 +980,7 @@ function classifyOpenRouterError(error: unknown) {
 
 function toPublicError(error: unknown) {
   if (error instanceof PublicError) return error
+  if (error instanceof StorageError) return new PublicError(error.message, error.status, error.logMessage)
   if (error instanceof SyntaxError) {
     return new PublicError('The request body is not valid JSON.', 400, `Invalid JSON request: ${error.message}`)
   }
@@ -713,6 +1010,20 @@ function numberProperty(value: unknown, key: string) {
   if (!value || typeof value !== 'object') return undefined
   const candidate = (value as Record<string, unknown>)[key]
   return typeof candidate === 'number' ? candidate : undefined
+}
+
+function numberOrNullProperty(value: unknown, key: string) {
+  if (!value || typeof value !== 'object') return null
+  const candidate = (value as Record<string, unknown>)[key]
+  return typeof candidate === 'number' ? candidate : null
+}
+
+function storageStatus(error: unknown) {
+  return error instanceof StorageError ? error.status : 500
+}
+
+function storageLogMessage(error: unknown, prefix: string) {
+  return error instanceof StorageError ? `${prefix}: ${error.logMessage}` : `${prefix}: ${errorMessage(error)}`
 }
 
 function stringProperty(value: unknown, key: string) {

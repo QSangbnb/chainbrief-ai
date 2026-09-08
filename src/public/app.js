@@ -13,6 +13,11 @@ const reportState = document.querySelector('#report-state')
 const errorState = document.querySelector('#error-state')
 const reportEl = document.querySelector('#report')
 const copyReportButton = document.querySelector('#copy-report')
+const downloadReportButton = document.querySelector('#download-report')
+const printReportButton = document.querySelector('#print-report')
+const shareReportButton = document.querySelector('#share-report')
+const watchReportButton = document.querySelector('#watch-report')
+const reportGeneratedAt = document.querySelector('#report-generated-at')
 const socialButtons = document.querySelectorAll('[data-channel]')
 const socialPanel = document.querySelector('#social-panel')
 const approvalCopy = document.querySelector('#approval-copy')
@@ -44,15 +49,38 @@ const authPassword = document.querySelector('#auth-password')
 const emailAuthSubmit = document.querySelector('#email-auth-submit')
 const authMessage = document.querySelector('#auth-message')
 const signOutButton = document.querySelector('#sign-out-button')
+const workspaceTabs = document.querySelectorAll('[data-view]')
+const appViews = document.querySelectorAll('.app-view')
+const adminTab = document.querySelector('#admin-tab')
+const historyTab = document.querySelector('#history-tab')
+const watchlistTab = document.querySelector('#watchlist-tab')
+const historySearch = document.querySelector('#history-search')
+const historyMessage = document.querySelector('#history-message')
+const historyList = document.querySelector('#history-list')
+const watchlistMessage = document.querySelector('#watchlist-message')
+const watchlistList = document.querySelector('#watchlist-list')
+const refreshAdminButton = document.querySelector('#refresh-admin')
+const adminMessage = document.querySelector('#admin-message')
+const adminMetrics = document.querySelector('#admin-metrics')
+const sharedNotice = document.querySelector('#shared-notice')
+const sharedTitle = document.querySelector('#shared-title')
+const toast = document.querySelector('#toast')
 
 let currentReportText = ''
 let currentIdentity = null
+let currentBriefId = null
+let currentBriefTitle = ''
+let currentGeneratedAt = null
 let pendingPost = ''
 let draftApproved = false
+let currentSocialChannel = null
 let authClient = null
 let currentUser = null
+let currentUserIsAdmin = false
 let authMode = 'sign-in'
 let authConfigurationError = ''
+let toastTimer = null
+let historySearchTimer = null
 
 initializeApp()
 
@@ -71,6 +99,12 @@ googleSignIn.addEventListener('click', () => {
 })
 emailAuthForm.addEventListener('submit', handleEmailAuth)
 signOutButton.addEventListener('click', handleSignOut)
+for (const tab of workspaceTabs) tab.addEventListener('click', () => showAppView(tab.dataset.view))
+historySearch.addEventListener('input', () => {
+  window.clearTimeout(historySearchTimer)
+  historySearchTimer = window.setTimeout(() => loadHistory(historySearch.value.trim()), 250)
+})
+refreshAdminButton.addEventListener('click', loadAdminOverview)
 document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && !authModal.classList.contains('hidden')) closeAuthModal()
 })
@@ -94,6 +128,8 @@ form.addEventListener('submit', async (event) => {
 
   formError.textContent = ''
   setResearchState('loading')
+  pendingPost = ''
+  currentSocialChannel = null
   socialPanel.classList.add('hidden')
   researchButton.disabled = true
 
@@ -107,8 +143,14 @@ form.addEventListener('submit', async (event) => {
     if (response.status === 401) handleExpiredSession(body.error)
     if (!response.ok) throw new Error(body.error ?? 'Research failed.')
 
+    currentBriefId = body.savedBrief?.id || null
+    currentBriefTitle = body.savedBrief?.title || query
+    currentGeneratedAt = body.savedBrief?.created_at || new Date().toISOString()
     currentReportText = renderReport(body.result)
+    updateReportActions()
     setResearchState('success')
+    if (body.savedBrief) loadHistory(historySearch.value.trim(), true)
+    else showToast('Report created. Saved history will appear after the database migration is installed.')
   } catch (error) {
     showError(error)
   } finally {
@@ -146,10 +188,12 @@ async function generateSocialPost(button) {
     if (!response.ok) throw new Error(body.error ?? 'Post generation failed.')
 
     pendingPost = body.draft
+    currentSocialChannel = button.dataset.channel
     approvalCopy.textContent = body.notice
     socialPost.value = pendingPost
-    draftPlatform.textContent =
-      button.dataset.channel === 'x' ? localized('platformX') : localized('platformBinance')
+    draftPlatform.textContent = localized(
+      button.dataset.channel === 'x' ? 'platformX' : button.dataset.channel === 'threads' ? 'platformThreads' : 'platformBinance',
+    )
     setDraftApproval(false)
     updateDraftCount()
     socialPanel.classList.remove('hidden')
@@ -176,6 +220,11 @@ copyReportButton.addEventListener('click', async () => {
   await navigator.clipboard.writeText(currentReportText)
   flash(copyReportButton, 'Copied')
 })
+
+downloadReportButton.addEventListener('click', downloadCurrentReport)
+printReportButton.addEventListener('click', () => window.print())
+shareReportButton.addEventListener('click', shareCurrentReport)
+watchReportButton.addEventListener('click', addCurrentReportToWatchlist)
 
 copyPostButton.addEventListener('click', async () => {
   if (!draftApproved) return
@@ -409,12 +458,41 @@ function createSection(title) {
 }
 
 function appendSourceLink(container, source) {
+  container.classList.add('source-link-row')
+  const badge = document.createElement('span')
+  badge.className = 'source-badge'
+  badge.textContent = classifySource(source.url)
   const anchor = document.createElement('a')
   anchor.href = source.url
   anchor.target = '_blank'
   anchor.rel = 'noreferrer'
-  anchor.textContent = source.url
-  container.append(anchor)
+  anchor.textContent = source.title && source.title !== 'Source' ? source.title : source.url
+  container.append(badge, anchor)
+}
+
+function classifySource(rawUrl) {
+  try {
+    const hostname = new URL(rawUrl).hostname.toLowerCase().replace(/^www\./, '')
+    const official = normalizeHostname(currentIdentity?.officialDomain)
+    if (official && (hostname === official || hostname.endsWith('.' + official))) {
+      return currentLanguage() === 'vi' ? 'Chính thức' : 'Official'
+    }
+    if (hostname === 'github.com' || hostname.endsWith('.github.com')) return 'Repository'
+    if (/^(docs?|developer|developers|support)\./.test(hostname)) return 'Docs'
+    if (/(etherscan|bscscan|arbiscan|polygonscan|snowtrace|solscan|blockchair)/.test(hostname)) return 'Explorer'
+    return currentLanguage() === 'vi' ? 'Nguồn ngoài' : 'External'
+  } catch {
+    return currentLanguage() === 'vi' ? 'Nguồn' : 'Source'
+  }
+}
+
+function normalizeHostname(value) {
+  if (!value) return ''
+  try {
+    return new URL(value.includes('://') ? value : 'https://' + value).hostname.toLowerCase().replace(/^www\./, '')
+  } catch {
+    return String(value).toLowerCase().replace(/^www\./, '').split('/')[0]
+  }
 }
 
 function appendInlineFormatting(container, text) {
@@ -480,7 +558,9 @@ function setDraftApproval(approved) {
 }
 
 function updateDraftCount() {
-  draftCount.textContent = localized('characters', Array.from(socialPost.value).length)
+  const count = Array.from(socialPost.value).length
+  const limit = currentSocialChannel === 'x' ? 280 : currentSocialChannel === 'threads' ? 500 : null
+  draftCount.textContent = limit ? localized('charactersWithLimit', `${count} / ${limit}`) : localized('characters', count)
 }
 
 function currentLanguage() {
@@ -503,6 +583,371 @@ async function initializeApp() {
   }
 
   updateAuthUi()
+  if (currentUser) await loadAccountCapabilities()
+
+  const sharedSlug = window.location.pathname.match(/^\/share\/([A-Za-z0-9_-]+)$/)?.[1]
+  if (sharedSlug) await loadSharedBrief(sharedSlug)
+}
+
+async function loadAccountCapabilities() {
+  if (!currentUser) return
+  try {
+    const body = await authenticatedJson('/api/account')
+    currentUserIsAdmin = Boolean(body.isAdmin)
+    adminTab.classList.toggle('hidden', !currentUserIsAdmin)
+    historyTab.classList.toggle('hidden', !body.workspaceReady)
+    watchlistTab.classList.toggle('hidden', !body.workspaceReady)
+  } catch (error) {
+    currentUserIsAdmin = false
+    adminTab.classList.add('hidden')
+    historyTab.classList.add('hidden')
+    watchlistTab.classList.add('hidden')
+    if (error instanceof Error && /session expired/i.test(error.message)) handleExpiredSession(error.message)
+  }
+}
+
+async function showAppView(view, force = false) {
+  if (!force && view !== 'research' && !currentUser) {
+    openAuthModal('Sign in to open your saved workspace.')
+    return
+  }
+  if (view === 'admin' && !currentUserIsAdmin) return
+
+  for (const tab of workspaceTabs) tab.classList.toggle('active', tab.dataset.view === view)
+  for (const panel of appViews) panel.classList.toggle('hidden', panel.id !== `${view}-view`)
+  socialPanel.classList.toggle('hidden', view !== 'research' || !pendingPost)
+
+  if (view === 'history') await loadHistory(historySearch.value.trim())
+  if (view === 'watchlist') await loadWatchlist()
+  if (view === 'admin') await loadAdminOverview()
+}
+
+async function loadHistory(search = '', silent = false) {
+  if (!currentUser) return
+  if (!silent) historyMessage.textContent = 'Loading saved briefs...'
+  try {
+    const params = new URLSearchParams()
+    if (search) params.set('search', search)
+    const body = await authenticatedJson(`/api/briefs${params.size ? `?${params}` : ''}`)
+    renderHistory(body.briefs || [])
+    historyMessage.textContent = body.briefs?.length ? '' : 'No saved briefs yet. Your next completed report will appear here.'
+  } catch (error) {
+    historyList.replaceChildren()
+    historyMessage.textContent = friendlyFeatureError(error)
+  }
+}
+
+function renderHistory(briefs) {
+  historyList.replaceChildren()
+  for (const brief of briefs) {
+    const card = createFeatureCard(
+      brief.title,
+      `${formatDate(brief.created_at)} · ${String(brief.language || 'en').toUpperCase()} · ${brief.query}`,
+    )
+    const open = createActionButton('Open', () => openSavedBrief(brief))
+    const rename = createActionButton('Rename', () => renameSavedBrief(brief))
+    const share = createActionButton('Share', () => shareBriefById(brief.id))
+    const remove = createActionButton('Delete', () => removeSavedBrief(brief), true)
+    card.actions.append(open, rename, share, remove)
+    historyList.append(card.root)
+  }
+}
+
+async function openSavedBrief(summary) {
+  try {
+    const body = await authenticatedJson(`/api/briefs/${summary.id}`)
+    const brief = body.brief
+    queryInput.value = brief.query || ''
+    identityHintInput.value = brief.identity_hint || ''
+    const language = document.querySelector(`input[name="language"][value="${brief.language}"]`)
+    if (language) language.checked = true
+    currentBriefId = brief.id
+    currentBriefTitle = brief.title
+    currentGeneratedAt = brief.updated_at || brief.created_at
+    currentReportText = renderReport(brief.result)
+    if (brief.report_text) currentReportText = brief.report_text
+    updateReportActions()
+    setResearchState('success')
+    await showAppView('research', true)
+    window.scrollTo({ top: document.querySelector('#research-view').offsetTop - 20, behavior: 'smooth' })
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : 'Could not open the brief.')
+  }
+}
+
+async function renameSavedBrief(brief) {
+  const title = window.prompt('New brief title', brief.title)?.trim()
+  if (!title || title === brief.title) return
+  try {
+    await authenticatedJson(`/api/briefs/${brief.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ title }),
+    })
+    if (currentBriefId === brief.id) currentBriefTitle = title
+    await loadHistory(historySearch.value.trim(), true)
+    showToast('Brief renamed.')
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : 'Could not rename the brief.')
+  }
+}
+
+async function removeSavedBrief(brief) {
+  if (!window.confirm(`Delete “${brief.title}”? This cannot be undone.`)) return
+  try {
+    await authenticatedJson(`/api/briefs/${brief.id}`, { method: 'DELETE' })
+    if (currentBriefId === brief.id) currentBriefId = null
+    await loadHistory(historySearch.value.trim(), true)
+    showToast('Brief deleted.')
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : 'Could not delete the brief.')
+  }
+}
+
+async function shareCurrentReport() {
+  if (!currentBriefId) {
+    showToast('Generate or open a saved brief before sharing.')
+    return
+  }
+  await shareBriefById(currentBriefId)
+}
+
+async function shareBriefById(id) {
+  try {
+    const body = await authenticatedJson(`/api/briefs/${id}/share`, { method: 'POST' })
+    const url = new URL(body.url, window.location.origin).toString()
+    await navigator.clipboard.writeText(url)
+    showToast('Public read-only link copied. Anyone with the link can view this report.')
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : 'Could not create a share link.')
+  }
+}
+
+function downloadCurrentReport() {
+  if (!currentReportText) return
+  const title = currentBriefTitle || currentIdentity?.name || 'chainbrief-report'
+  const markdown = `# ${title}\n\nGenerated: ${formatDate(currentGeneratedAt)}\n\n${currentReportText}\n`
+  const blob = new window.Blob([markdown], { type: 'text/markdown;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `${safeFilename(title)}.md`
+  link.click()
+  URL.revokeObjectURL(url)
+}
+
+async function addCurrentReportToWatchlist() {
+  if (!currentIdentity || !currentUser) return
+  const payload = {
+    name: currentIdentity.name || currentIdentity.symbol || currentBriefTitle || 'Tracked project',
+    symbol: currentIdentity.symbol || null,
+    official_domain: currentIdentity.officialDomain || null,
+    blockchain: currentIdentity.blockchain || null,
+    contract_address: currentIdentity.contractAddress || null,
+  }
+  try {
+    await authenticatedJson('/api/watchlist', { method: 'POST', body: JSON.stringify(payload) })
+    showToast('Added to your watchlist.')
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : 'Could not update the watchlist.')
+  }
+}
+
+async function loadWatchlist() {
+  if (!currentUser) return
+  watchlistMessage.textContent = 'Loading watchlist...'
+  try {
+    const body = await authenticatedJson('/api/watchlist')
+    renderWatchlist(body.items || [])
+    watchlistMessage.textContent = body.items?.length ? '' : 'Your watchlist is empty. Open a report and choose “Add to watchlist”.'
+  } catch (error) {
+    watchlistList.replaceChildren()
+    watchlistMessage.textContent = friendlyFeatureError(error)
+  }
+}
+
+function renderWatchlist(items) {
+  watchlistList.replaceChildren()
+  for (const item of items) {
+    const facts = [item.symbol, item.blockchain, item.official_domain].filter(Boolean).join(' · ') || 'Verified identity saved'
+    const card = createFeatureCard(item.name, facts)
+    const refresh = createActionButton('Research update', () => researchWatchlistItem(item))
+    const remove = createActionButton('Remove', () => removeWatchlistItem(item), true)
+    card.actions.append(refresh, remove)
+    watchlistList.append(card.root)
+  }
+}
+
+function researchWatchlistItem(item) {
+  queryInput.value = `What are the latest verified developments, risks, and material changes for ${item.name}?`
+  identityHintInput.value = [item.official_domain, item.blockchain, item.contract_address].filter(Boolean).join('\n')
+  showAppView('research', true)
+  form.requestSubmit()
+}
+
+async function removeWatchlistItem(item) {
+  try {
+    await authenticatedJson(`/api/watchlist/${item.id}`, { method: 'DELETE' })
+    await loadWatchlist()
+    showToast('Removed from watchlist.')
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : 'Could not remove the watchlist item.')
+  }
+}
+
+async function loadAdminOverview() {
+  if (!currentUserIsAdmin) return
+  adminMessage.textContent = 'Loading live service metrics...'
+  refreshAdminButton.disabled = true
+  try {
+    const body = await authenticatedJson('/api/admin/overview')
+    renderAdminOverview(body)
+    adminMessage.textContent = `Runtime started ${formatDate(body.startedAt)}. Runtime counters reset when Render restarts.`
+  } catch (error) {
+    adminMetrics.replaceChildren()
+    adminMessage.textContent = error instanceof Error ? error.message : 'Could not load the admin overview.'
+  } finally {
+    refreshAdminButton.disabled = false
+  }
+}
+
+function renderAdminOverview(data) {
+  const researchTotal = (data.metrics?.research?.succeeded || 0) + (data.metrics?.research?.failed || 0)
+  const socialTotal = (data.metrics?.social?.succeeded || 0) + (data.metrics?.social?.failed || 0)
+  const latencyTotal = (data.metrics?.research?.totalLatencyMs || 0) + (data.metrics?.social?.totalLatencyMs || 0)
+  const requestTotal = researchTotal + socialTotal
+  const values = [
+    ['Active requests', `${data.activePaidRequests || 0} / ${data.concurrencyMax || 0}`],
+    ['Research requests', String(researchTotal)],
+    ['Social drafts', String(socialTotal)],
+    ['Failed requests', String((data.metrics?.research?.failed || 0) + (data.metrics?.social?.failed || 0))],
+    ['Average latency', requestTotal ? `${Math.round(latencyTotal / requestTotal / 100) / 10}s` : '—'],
+    ['OpenRouter today', formatCredits(data.openrouter?.usageDaily)],
+    ['OpenRouter month', formatCredits(data.openrouter?.usageMonthly)],
+    ['Key limit remaining', data.openrouter?.limitRemaining == null ? 'No key cap' : formatCredits(data.openrouter.limitRemaining)],
+  ]
+  adminMetrics.replaceChildren()
+  for (const [label, value] of values) {
+    const card = document.createElement('div')
+    card.className = 'metric-card'
+    const name = document.createElement('span')
+    name.textContent = label
+    const amount = document.createElement('strong')
+    amount.textContent = value
+    card.append(name, amount)
+    adminMetrics.append(card)
+  }
+}
+
+async function loadSharedBrief(slug) {
+  document.body.classList.add('shared-view')
+  sharedNotice.classList.remove('hidden')
+  setResearchState('loading')
+  try {
+    const response = await fetch(`/api/shared/${encodeURIComponent(slug)}`, { headers: { accept: 'application/json' } })
+    const body = await readJsonResponse(response, 'The shared report could not be loaded.')
+    if (!response.ok) throw new Error(body.error || 'Shared brief not found.')
+    const brief = body.brief
+    sharedTitle.textContent = brief.title
+    currentBriefTitle = brief.title
+    currentGeneratedAt = brief.updated_at || brief.created_at
+    const language = document.querySelector(`input[name="language"][value="${brief.language}"]`)
+    if (language) language.checked = true
+    currentReportText = renderReport(brief.result)
+    if (brief.report_text) currentReportText = brief.report_text
+    updateReportActions()
+    setResearchState('success')
+  } catch (error) {
+    showError(error)
+  }
+}
+
+function createFeatureCard(title, detail) {
+  const root = document.createElement('article')
+  root.className = 'feature-card'
+  const copy = document.createElement('div')
+  const heading = document.createElement('h3')
+  heading.textContent = title
+  const paragraph = document.createElement('p')
+  paragraph.textContent = detail
+  copy.append(heading, paragraph)
+  const actions = document.createElement('div')
+  actions.className = 'feature-card-actions'
+  root.append(copy, actions)
+  return { root, actions }
+}
+
+function createActionButton(label, handler, danger = false) {
+  const button = document.createElement('button')
+  button.type = 'button'
+  button.className = `secondary${danger ? ' danger-button' : ''}`
+  button.textContent = label
+  button.addEventListener('click', handler)
+  return button
+}
+
+async function authenticatedJson(path, options = {}) {
+  const token = await authClient?.accessToken()
+  if (!token) {
+    handleExpiredSession('Your session expired. Please sign in again.')
+    throw new Error('Your session expired. Please sign in again.')
+  }
+  const response = await fetch(path, {
+    ...options,
+    headers: {
+      accept: 'application/json',
+      authorization: 'Bearer ' + token,
+      ...(options.body ? { 'content-type': 'application/json' } : {}),
+      ...(options.headers || {}),
+    },
+  })
+  const body = await readJsonResponse(response, 'The service returned an invalid response.')
+  if (response.status === 401) handleExpiredSession(body.error)
+  if (!response.ok) throw new Error(body.error || 'The request could not be completed.')
+  return body
+}
+
+function updateReportActions() {
+  reportGeneratedAt.textContent = currentGeneratedAt ? `Evidence checked ${formatDate(currentGeneratedAt)}` : ''
+  shareReportButton.disabled = !currentUser || !currentBriefId
+  watchReportButton.disabled = !currentUser || !currentIdentity
+}
+
+function formatDate(value) {
+  if (!value) return 'Unknown date'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return 'Unknown date'
+  return new Intl.DateTimeFormat(currentLanguage() === 'vi' ? 'vi-VN' : 'en', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(date)
+}
+
+function formatCredits(value) {
+  return typeof value === 'number' ? `$${value.toFixed(4)}` : '—'
+}
+
+function safeFilename(value) {
+  return String(value)
+    .normalize('NFKD')
+    .replace(/[^a-zA-Z0-9-_ ]/g, '')
+    .trim()
+    .replace(/\s+/g, '-')
+    .slice(0, 80) || 'chainbrief-report'
+}
+
+function friendlyFeatureError(error) {
+  const message = error instanceof Error ? error.message : ''
+  if (/configured|unavailable/i.test(message)) {
+    return 'Saved workspace setup is pending. Research and social drafts still work normally.'
+  }
+  return message || 'This workspace could not be loaded.'
+}
+
+function showToast(message) {
+  window.clearTimeout(toastTimer)
+  toast.textContent = message
+  toast.classList.remove('hidden')
+  toastTimer = window.setTimeout(() => toast.classList.add('hidden'), 4200)
 }
 
 async function handleEmailAuth(event) {
@@ -543,6 +988,7 @@ async function handleEmailAuth(event) {
 
     authPassword.value = ''
     updateAuthUi()
+    await loadAccountCapabilities()
     closeAuthModal()
   } catch (error) {
     setAuthMessage(error instanceof Error ? error.message : 'Authentication failed.', true)
@@ -559,8 +1005,16 @@ async function handleSignOut() {
     currentUser = null
     currentReportText = ''
     currentIdentity = null
+    currentBriefId = null
+    currentUserIsAdmin = false
+    adminTab.classList.add('hidden')
+    historyTab.classList.add('hidden')
+    watchlistTab.classList.add('hidden')
+    historyList.replaceChildren()
+    watchlistList.replaceChildren()
     socialPanel.classList.add('hidden')
     setResearchState('empty')
+    showAppView('research', true)
     updateAuthUi()
     closeAuthModal()
   } finally {
@@ -618,6 +1072,7 @@ function updateAuthUi() {
     accountEmail.textContent = ''
     accountAvatar.textContent = 'C'
   }
+  updateReportActions()
 }
 
 function setAuthControlsDisabled(disabled) {
@@ -695,7 +1150,10 @@ function showError(error) {
 function showSocialError(error, channel) {
   pendingPost = ''
   socialPost.value = ''
-  draftPlatform.textContent = channel === 'x' ? localized('platformX') : localized('platformBinance')
+  currentSocialChannel = channel
+  draftPlatform.textContent = localized(
+    channel === 'x' ? 'platformX' : channel === 'threads' ? 'platformThreads' : 'platformBinance',
+  )
   draftCount.textContent = localized('characters', 0)
   draftStatus.textContent = localized('approvalRequired')
   approvalCopy.textContent = localized('socialFailurePreservesReport')
@@ -714,6 +1172,7 @@ function localized(key, value) {
   const dictionary = {
     platformX: isVi ? 'Nền tảng: X' : 'Platform: X',
     platformBinance: isVi ? 'Nền tảng: Binance Square' : 'Platform: Binance Square',
+    platformThreads: isVi ? 'Nền tảng: Threads' : 'Platform: Threads',
     approvedDraft: isVi ? 'Bản nháp đã được phê duyệt' : 'Approved draft',
     approvalRequired: isVi ? 'Bản nháp – cần phê duyệt' : 'Draft - approval required',
     socialFailurePreservesReport: isVi
@@ -721,7 +1180,7 @@ function localized(key, value) {
       : 'The research report remains available. This error only affects the social draft.',
     socialError: isVi ? 'Không thể tạo bản nháp mạng xã hội an toàn.' : 'Could not create a safe social draft.',
   }
-  if (key === 'characters') return isVi ? `${value} ký tự` : `${value} characters`
+  if (key === 'characters' || key === 'charactersWithLimit') return isVi ? `${value} ký tự` : `${value} characters`
   return dictionary[key]
 }
 
